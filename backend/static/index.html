@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>美股指数波动分析 - 海龟交易法则</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+</head>
+<body>
+    <header class="header">
+        <h1>美股指数波动分析</h1>
+        <span class="subtitle">基于《海龟交易法则》的技术指标与趋势跟踪</span>
+    </header>
+
+    <!-- 控制面板 -->
+    <section class="controls">
+        <div class="index-tabs" id="indexTabs">
+            <!-- JS 动态填充 -->
+        </div>
+        <div class="time-controls">
+            <div class="time-presets" id="timePresets">
+                <button data-days="1">1天</button>
+                <button data-days="7">1周</button>
+                <button data-days="30">1月</button>
+                <button data-days="90">3月</button>
+                <button data-days="180" class="active">6月</button>
+                <button data-days="365">1年</button>
+            </div>
+            <div class="custom-date">
+                <input type="date" id="startDate">
+                <span>至</span>
+                <input type="date" id="endDate">
+                <button id="applyDate">确定</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- 主内容区 -->
+    <main class="main-content">
+        <div class="chart-container">
+            <div id="mainChart"></div>
+            <div class="chart-legend">
+                <span class="legend-bb">布林带(20,2)</span>
+                <span class="legend-dc">唐奇安通道(20)</span>
+            </div>
+        </div>
+        <aside class="side-panel" id="sidePanel">
+            <div class="panel-section stats" id="statsPanel">
+                <h3>统计指标</h3>
+                <div id="statsContent"><p class="placeholder">请选择指数和时间范围</p></div>
+            </div>
+            <div class="panel-section advice" id="advicePanel">
+                <h3>趋势跟踪建议</h3>
+                <div id="adviceContent"><p class="placeholder">等待数据加载...</p></div>
+            </div>
+            <div class="panel-section indicators" id="indicatorsPanel">
+                <h3>海龟交易法则指标</h3>
+                <div id="indicatorsContent"><p class="placeholder">—</p></div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- 浮动聊天按钮 -->
+    <button class="chat-fab" id="chatFab" title="询问海龟交易法则">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+    </button>
+
+    <!-- 聊天对话框 -->
+    <div class="chat-dialog" id="chatDialog">
+        <div class="chat-header">
+            <h3>海龟交易法则 · 智能问答</h3>
+            <p class="chat-hint">基于《海龟交易法则》原书内容回答，非通用知识库</p>
+            <button class="chat-close" id="chatClose">&times;</button>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+            <div class="message assistant">
+                <div class="msg-content">
+                    你好！我是海龟交易法则学习助手。<br>
+                    你可以问我关于书中任何内容，例如：<br>
+                    · 海龟交易法则的入市策略有哪些？<br>
+                    · 如何计算N值/ATR？<br>
+                    · 海龟的头寸管理规则是什么？
+                </div>
+            </div>
+        </div>
+        <div class="chat-input-area">
+            <input type="text" id="chatInput" placeholder="输入你的问题..." autocomplete="off">
+            <button id="chatSend">发送</button>
+        </div>
+    </div>
+
+    <script src="/js/app.js"></script>
+    <script src="/js/charts.js"></script>
+    <script src="/js/indicators.js"></script>
+    <script src="/js/chat.js"></script>
+</body>
+</html>
