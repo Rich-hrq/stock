@@ -8,7 +8,7 @@
 
 import pandas as pd
 
-from config import BOLLINGER_PERIOD, BOLLINGER_STD, ATR_PERIOD, DONCHIAN_ENTRY, DONCHIAN_STOP
+from ..config import BOLLINGER_PERIOD, BOLLINGER_STD, ATR_PERIOD, DONCHIAN_ENTRY, DONCHIAN_STOP
 
 
 def compute_bollinger(df: pd.DataFrame, period: int = BOLLINGER_PERIOD, num_std: float = BOLLINGER_STD) -> pd.DataFrame:

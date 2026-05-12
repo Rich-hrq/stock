@@ -7,7 +7,7 @@ from functools import lru_cache
 import pandas as pd
 import yfinance as yf
 
-from config import US_INDEXES, HTTP_PROXY
+from ..config import US_INDEXES, HTTP_PROXY
 
 
 def _set_proxy() -> None:

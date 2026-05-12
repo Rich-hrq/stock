@@ -9,8 +9,8 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-from config import STATIC_DIR
-from routers import index_data, chat
+from .config import STATIC_DIR
+from .routers import index_data, chat
 
 app = FastAPI(
     title="美股指数波动分析 & 海龟交易法则问答",

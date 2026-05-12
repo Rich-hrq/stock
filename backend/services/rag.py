@@ -13,7 +13,7 @@ from langchain_anthropic import ChatAnthropic
 from sentence_transformers import SentenceTransformer
 from langgraph.graph import StateGraph, END
 
-from config import (
+from ..config import (
     CHROMA_DB_DIR,
     TOP_K_RETRIEVAL,
     ANTHROPIC_API_KEY,

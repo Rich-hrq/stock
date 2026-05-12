@@ -5,9 +5,9 @@ from datetime import datetime
 import pandas as pd
 from fastapi import APIRouter, Query, HTTPException
 
-from config import US_INDEXES
-from services.market_data import fetch_index_data, list_indexes, get_index_name
-from services.indicators import (
+from ..config import US_INDEXES
+from ..services.market_data import fetch_index_data, list_indexes, get_index_name
+from ..services.indicators import (
     compute_bollinger,
     compute_atr,
     compute_donchian,

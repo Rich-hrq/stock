@@ -3,7 +3,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from services.rag import ask_question
+from ..services.rag import ask_question
 
 
 class ChatRequest(BaseModel):
