@@ -137,7 +137,13 @@ def generate_node(state: RAGState) -> dict:
     )
 
     response = llm.invoke(prompt)
-    return {"answer": response.content}
+    content = response.content
+    # DeepSeek 兼容 API 返回 list[dict]，标准 Anthropic 返回 str
+    if isinstance(content, list):
+        answer = "".join(block.get("text", "") for block in content if isinstance(block, dict))
+    else:
+        answer = str(content)
+    return {"answer": answer}
 
 
 # ---- 构建状态图 ----
