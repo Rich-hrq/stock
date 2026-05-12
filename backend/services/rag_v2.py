@@ -30,11 +30,13 @@ from ..config import (
     ANTHROPIC_BASE_URL,
 )
 
-# 相关性阈值：平均余弦距离 < 此值视为相关
-# ChromaDB 默认 distance = 1 - cosine_similarity
-# distance < 0.8  ≈ cosine_similarity > 0.2 → 有语义关联
-# distance > 1.2  ≈ cosine_similarity < -0.2 → 基本无关
-RELEVANCE_THRESHOLD = 1.0
+# 相关性阈值：基于 L2 距离（ChromaDB 默认使用欧几里得距离）
+# 本嵌入模型 (multilingual-MiniLM-L12-v2, 384维) 的实际距离范围：
+#   高度相关: < 8.0     (检索到的内容与问题语义相关)
+#   低相关:   8.0 - 12.0  (有一定关联但不精确)
+#   基本无关: > 12.0     (随机噪声级别)
+# 这些阈值基于 6 个测试问题的实测数据校准
+RELEVANCE_THRESHOLD = 10.0
 MAX_REWRITE_COUNT = 1  # 最多额外改写 1 次
 
 
