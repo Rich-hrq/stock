@@ -17,10 +17,12 @@ import json
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# 将 stock_website/ 加入 sys.path，使 backend 成为可导入的包
+_project_root = Path(__file__).parent.parent.parent  # stock_website/
+sys.path.insert(0, str(_project_root))
 
-from services.rag import ask_question as ask_v1
-from services.rag_v2 import ask_question_v2 as ask_v2
+from backend.services.rag import ask_question as ask_v1
+from backend.services.rag_v2 import ask_question_v2 as ask_v2
 
 
 # ---- 测试问题集 ----
