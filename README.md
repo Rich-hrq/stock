@@ -12,6 +12,7 @@
 ```
 stock_website/
 ├── backend/
+│   ├── __init__.py           # Python 包标识
 │   ├── main.py              # FastAPI 应用入口
 │   ├── config.py            # 全局配置（API密钥、指标参数等）
 │   ├── requirements.txt     # Python 依赖
@@ -51,7 +52,8 @@ stock_website/
 | yfinance | 美股指数 OHLCV 数据获取 |
 | pandas | 数据处理 |
 | langgraph | RAG 流水线编排 |
-| langchain-anthropic | Claude LLM 调用 |
+| langchain-text-splitters | 文本分块（RecursiveCharacterTextSplitter） |
+| langchain-anthropic | LLM 调用（支持 Claude / DeepSeek 等 Anthropic 兼容 API） |
 | chromadb | 向量数据库，存储知识库嵌入 |
 | sentence-transformers | 本地文本嵌入模型 |
 | PyMuPDF | PDF 文本提取 |
@@ -74,9 +76,10 @@ pip install -r backend/requirements.txt
 ### 3. 设置 API Key
 
 ```bash
-set -x ANTHROPIC_API_KEY sk-ant-xxx   # fish shell
-# 或 export ANTHROPIC_API_KEY=sk-ant-xxx  # bash
+set -x ANTHROPIC_AUTH_TOKEN sk-ant-xxx   # fish shell
+# 也支持 ANTHROPIC_API_KEY 环境变量名
 ```
+> 聊天功能支持 Anthropic 官方 API 及兼容服务（如 DeepSeek），详见「服务管理」章节。
 
 ### 4. 构建知识库（首次运行，一次性）
 
