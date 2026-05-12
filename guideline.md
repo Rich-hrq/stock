@@ -56,18 +56,20 @@
     │
     ├─ 2. routers/chat.py: 接收请求
     │
-    ├─ 3. services/rag.py: ask_question()
+    ├─ 3. services/rag_v3.py: ask_question_v3()
     │       │
-    │       ├─ LangGraph 状态图编译（模块加载时一次编译，后续复用）
+    │       ├─ evaluate_node: 判断问题是否已精确
+    │       │   ├─ 精确 → 跳过扩展，直接用原问题检索
+    │       │   └─ 不精确 → expand_node: 生成 2-3 个专业同义转述
     │       │
-    │       ├─ Node 1: retrieve_node()
-    │       │   ├─ sentence-transformers: 将问题文本嵌入为向量
-    │       │   ├─ ChromaDB.query(): 余弦相似度搜索 top-4 最相关文本块
-    │       │   └─ 返回 context + sources（含页码）
+    │       ├─ retrieve_node: 多查询融合检索
+    │       │   ├─ 用所有查询分别检索 ChromaDB
+    │       │   ├─ 合并去重，按距离排序
+    │       │   └─ 返回 top-4 最相关文本块
     │       │
-    │       └─ Node 2: generate_node()
+    │       └─ generate_node:
     │           ├─ 组装 Prompt：检索到的原文 + 历史对话 + 用户问题
-    │           ├─ ChatAnthropic (Claude).invoke(prompt)
+    │           ├─ ChatAnthropic (兼容 Claude / DeepSeek).invoke(prompt)
     │           └─ 返回 answer（严格基于书中原文）
     │
     └─ 4. chat.js: 渲染回答 + 来源页码引用
