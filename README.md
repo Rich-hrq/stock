@@ -22,10 +22,13 @@ stock_website/
 │   ├── services/
 │   │   ├── market_data.py   # yfinance 数据获取 + 缓存 + 代理
 │   │   ├── indicators.py    # 布林带、ATR、唐奇安通道、趋势判断、投资建议
-│   │   └── rag.py           # LangGraph RAG 流水线（检索 + 生成）
+│   │   └── rag.py           # RAG v1（retrieve → generate）
+│   │   ├── rag_v2.py          # RAG v2（rewrite → judge → 条件路由）
+│   │   └── rag_v3.py          # RAG v3（evaluate → 选择性扩展 → 多查询融合）
 │   ├── knowledge/
-│   │   ├── ingest.py        # PDF → 切片 → 向量化 → ChromaDB（一次性脚本）
-│   │   └── chroma_db/       # ChromaDB 持久化向量库（.gitignore）
+│   │   ├── ingest.py          # PDF → 切片 → 向量化 → ChromaDB（一次性脚本）
+│   │   ├── test_rag.py        # v1/v2/v3 对比测试脚本
+│   │   └── chroma_db/         # ChromaDB 持久化向量库（.gitignore）
 │   └── static/              # 前端静态文件
 │       ├── index.html
 │       ├── css/styles.css
@@ -182,9 +185,11 @@ lsof -ti:8000 | xargs kill 2>/dev/null; sleep 1
 ```
 浏览器 ──→ FastAPI ──→ /api/indices/  ──→ yfinance（Yahoo Finance）
     │                      │                    │
-    │                      ├──→ /api/chat ──→ LangGraph ──→ ChromaDB ──→ Claude
-    │                      │
-    └──← 静态文件（HTML/CSS/JS）
+    │                      ├──→ /api/chat ──→ LangGraph ──→ ChromaDB ──→ LLM
+    │                      │                    │
+    └──← 静态文件（HTML/CSS/JS）              ├─ v1: retrieve → generate
+                                               ├─ v2: rewrite → retrieve → judge → 条件路由
+                                               └─ v3: evaluate → 选择性扩展 → 多查询融合 → generate
 ```
 
 ## 海龟交易法则指标说明
