@@ -12,11 +12,15 @@ STATIC_DIR = BACKEND_DIR / "static"
 PDF_PATH = PROJECT_ROOT.parent / "海龟交易法则.pdf"
 
 # ---- Anthropic API 配置 ----
+# 支持多种环境变量名：ANTHROPIC_API_KEY / CLAUDE_KEY / ANTHROPIC_AUTH_TOKEN
 ANTHROPIC_API_KEY = os.environ.get(
-    "ANTHROPIC_API_KEY", os.environ.get("CLAUDE_KEY", "")
+    "ANTHROPIC_API_KEY",
+    os.environ.get("CLAUDE_KEY",
+        os.environ.get("ANTHROPIC_AUTH_TOKEN", "")
+    )
 )
+ANTHROPIC_BASE_URL = os.environ.get("ANTHROPIC_BASE_URL", "")
 ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
-EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "claude-sonnet-4-6")
 
 # ---- 美股指数配置 ----
 US_INDEXES: dict[str, str] = {

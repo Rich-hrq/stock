@@ -18,6 +18,7 @@ from ..config import (
     TOP_K_RETRIEVAL,
     ANTHROPIC_API_KEY,
     ANTHROPIC_MODEL,
+    ANTHROPIC_BASE_URL,
 )
 
 
@@ -57,12 +58,15 @@ def _get_llm() -> ChatAnthropic:
     """懒加载 LLM 实例。"""
     global _llm
     if _llm is None:
-        _llm = ChatAnthropic(
+        kwargs = dict(
             model=ANTHROPIC_MODEL,
             api_key=ANTHROPIC_API_KEY,
-            temperature=0.3,  # 低温度以确保回答忠实于原书
+            temperature=0.3,
             max_tokens=2048,
         )
+        if ANTHROPIC_BASE_URL:
+            kwargs["base_url"] = ANTHROPIC_BASE_URL
+        _llm = ChatAnthropic(**kwargs)
     return _llm
 
 
