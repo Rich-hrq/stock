@@ -90,13 +90,80 @@ python backend/knowledge/ingest.py
 ### 5. 启动服务
 
 ```bash
-uvicorn backend.main:app --reload --port 8000
+# 完整启动命令（含代理 + LLM API），从 stock_website 目录执行
+all_proxy=http://127.0.0.1:7897 uvicorn backend.main:app --reload --port 8000
 ```
+
+> 或参考下方「服务管理」章节进行启动、停止、重启。
 
 ### 6. 访问
 
 - 前端页面：http://localhost:8000
 - API 文档（Swagger）：http://localhost:8000/docs
+
+---
+
+## 服务管理
+
+### 环境变量
+
+| 变量 | 必需 | 说明 |
+|------|------|------|
+| `all_proxy` | 建议 | HTTP 代理，国内环境访问 Yahoo Finance / HuggingFace 需要 |
+| `ANTHROPIC_AUTH_TOKEN` | 聊天功能必需 | LLM API Key（也支持 `ANTHROPIC_API_KEY`） |
+| `ANTHROPIC_BASE_URL` | 可选 | 自定义 API 端点（如使用 DeepSeek 等兼容服务） |
+| `ANTHROPIC_MODEL` | 可选 | 模型名称，默认 `claude-sonnet-4-6` |
+
+### 启动服务
+
+```bash
+# 从 stock_website 目录执行，不含聊天功能（仅指数分析）：
+all_proxy=http://127.0.0.1:7897 /path/to/.stock/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000 &
+
+# 含聊天功能（需设置 LLM 环境变量）：
+env all_proxy=http://127.0.0.1:7897 \
+    ANTHROPIC_AUTH_TOKEN=<your-api-key> \
+    ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic \
+    ANTHROPIC_MODEL='deepseek-v4-pro[1m]' \
+    /path/to/.stock/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000 &
+```
+
+**参数说明：**
+- `--host 0.0.0.0`：允许局域网内其他设备访问（仅本机使用可设为 `127.0.0.1`）
+- `--port 8000`：监听端口
+- `--reload`：开发模式，代码变更时自动重启（生产环境不要用）
+- 末尾 `&`：后台运行
+
+### 检查运行状态
+
+```bash
+# 方法1：健康检查接口
+curl http://localhost:8000/api/health
+# 返回 {"status":"ok"} 即正常运行
+
+# 方法2：检查端口占用
+lsof -i:8000
+```
+
+### 停止服务
+
+```bash
+# 方法1：查找并终止 uvicorn 进程
+pkill -f "uvicorn backend.main"
+
+# 方法2：通过端口终止
+lsof -ti:8000 | xargs kill
+
+# 方法3：强制终止
+lsof -ti:8000 | xargs kill -9
+```
+
+### 重启服务
+
+```bash
+lsof -ti:8000 | xargs kill 2>/dev/null; sleep 1
+# 再执行「启动服务」命令
+```
 
 ## API 接口
 
