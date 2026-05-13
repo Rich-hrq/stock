@@ -6,9 +6,9 @@
     const searchBtn = document.getElementById("searchPrediction");
     const limitInput = document.getElementById("predLimit");
     const thresholdInput = document.getElementById("predThreshold");
-    const resultsArea = document.getElementById("predictionResults");
     const emptyState = document.getElementById("emptyState");
     const cardArea = document.getElementById("cardArea");
+    const cardContent = document.getElementById("cardContent");
     const prevBtn = document.getElementById("prevMarket");
     const nextBtn = document.getElementById("nextMarket");
     const pageIndicator = document.getElementById("pageIndicator");
@@ -118,8 +118,8 @@
         prevBtn.disabled = currentIdx === 0;
         nextBtn.disabled = currentIdx === total - 1;
 
-        // 组装卡片 HTML
-        cardArea.innerHTML = `
+        // 组装卡片 HTML（写入 cardContent，不覆盖翻页控件）
+        cardContent.innerHTML = `
             <div class="market-card-full">
                 <div class="card-question">${escapeHtml(m.question)}</div>
 
