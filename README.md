@@ -6,7 +6,7 @@
 - 海龟交易法则技术指标：布林带、ATR/N值、唐奇安通道、趋势判断
 - 自动生成趋势跟踪投资建议
 - 基于原书 PDF 的 RAG 智能问答（LangGraph v3：智能评估 + 选择性扩展 + 多查询融合检索）
-- Polymarket 预测市场数据聚合（按关键词筛选事件，展示市场赔率、成交量等）
+- Polymarket 预测市场浏览（独立页面，按事件分组翻页，关键词/活跃日期高亮，概率条可视化）
 
 ## 目录结构
 
@@ -33,13 +33,17 @@ stock_website/
 │   │   ├── test_rag.py        # v1/v2/v3 对比测试脚本
 │   │   └── chroma_db/         # ChromaDB 持久化向量库（.gitignore）
 │   └── static/              # 前端静态文件
-│       ├── index.html
-│       ├── css/styles.css
+│       ├── index.html       # 主页（指数分析）
+│       ├── prediction.html  # 预测市场页
+│       ├── css/
+│       │   ├── styles.css   # 主页样式
+│       │   └── prediction.css # 预测市场页样式
 │       └── js/
 │           ├── app.js       # 应用入口，状态管理
 │           ├── charts.js    # ECharts K线图 + 布林带 + 唐奇安
 │           ├── indicators.js # 侧边面板：统计、指标、建议
-│           └── chat.js      # RAG 聊天对话框
+│           ├── chat.js      # RAG 聊天对话框
+│           └── prediction.js # 预测市场查询与渲染
 ├── README.md                # 项目说明
 ├── guideline.md             # 代码知识讲解 + 数据流 pipeline
 └── DEBUG.md                 # 踩坑记录
@@ -107,7 +111,8 @@ all_proxy=http://127.0.0.1:7897 uvicorn backend.main:app --reload --port 8000
 
 ### 6. 访问
 
-- 前端页面：http://localhost:8000
+- 主页（指数分析）：http://localhost:8000
+- 预测市场页：http://localhost:8000/prediction.html
 - API 文档（Swagger）：http://localhost:8000/docs
 
 ---
