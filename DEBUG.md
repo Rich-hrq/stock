@@ -129,6 +129,30 @@ else:
 
 ---
 
+## Nginx 静态文件 403 Forbidden
+
+**现象**：nginx 配置了直接 serve 静态文件（CSS/JS/HTML），但浏览器访问返回 403
+
+**原因**：nginx worker 进程以 `www-data` 用户运行，而项目目录在 `/home/rich/stock/...` 下。Ubuntu 默认 `/home/rich` 权限为 750（`rwxr-x---`），`www-data` 无法穿越（无 execute 权限进入 `/home/rich`）
+
+**解决**：去掉 nginx 配置中的静态文件 `location` 块，所有请求统一反向代理到 uvicorn。静态文件优化对于此类小规模部署并非必要
+
+---
+
+## Nginx 反向代理必须透传的 Header
+
+**注意**：通过 nginx 代理后，若不设置以下 header，后端日志中的客户端 IP 会全部显示 127.0.0.1
+
+**必须设置**（每个 `location` 块都要加）：
+```nginx
+proxy_set_header Host $host;
+proxy_set_header X-Real-IP $remote_addr;
+proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+proxy_set_header X-Forwarded-Proto $scheme;
+```
+
+---
+
 ## v2 改写可能降低精确问题的检索质量
 
 **现象**：v2 将 "海龟交易法则的入市策略是什么？" 改写为 "海龟交易法则 入市 策略 突破 做多 做空" 后，检索来源从 p238（正确答案页）变为 p9（目录页），回答质量下降
