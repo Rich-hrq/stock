@@ -172,28 +172,22 @@ body {
     overflow-y: auto;
 }
 
-.event-badge {
-    display: inline-block;
-    padding: 4px 14px;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    font-size: 12px;
-    color: var(--text-dim);
-    margin-bottom: 16px;
-    max-width: 90%;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* ===== Market 卡片 ===== */
 .card-wrapper {
     width: 100%;
-    max-width: 700px;
+    max-width: 760px;
 }
 
-.market-card-full {
+/* ===== 关键词高亮 ===== */
+.kw-highlight {
+    background: #f59e0b;
+    color: #1e1b0c;
+    padding: 0 2px;
+    border-radius: 2px;
+    font-weight: 600;
+}
+
+/* ===== Event 卡片 ===== */
+.event-card-full {
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 14px;
@@ -206,98 +200,196 @@ body {
     to   { opacity: 1; transform: translateY(0); }
 }
 
-.card-question {
-    font-size: 20px;
+.event-card-header {
+    margin-bottom: 24px;
+}
+
+.event-card-title {
+    font-size: 19px;
     font-weight: 700;
     line-height: 1.5;
     color: var(--text);
-    margin-bottom: 20px;
+    margin-bottom: 10px;
 }
 
-.card-meta-row {
-    display: flex;
-    gap: 32px;
-    margin-bottom: 24px;
-}
-
-.card-meta-item {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.card-meta-label {
-    font-size: 11px;
+.event-card-desc {
+    font-size: 13px;
+    line-height: 1.6;
     color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
 }
 
-.card-meta-value {
-    font-size: 16px;
+/* ===== Markets 区域 ===== */
+.markets-heading {
+    font-size: 13px;
+    color: var(--accent);
     font-weight: 600;
-    font-variant-numeric: tabular-nums;
+    margin-bottom: 4px;
+}
+
+.markets-count {
     color: var(--text);
 }
 
-.card-meta-value.accent { color: var(--accent); }
-
-/* ===== 概率条 ===== */
-.card-outcomes {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    margin-bottom: 24px;
+.markets-summary {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-dim);
+    margin-left: 8px;
 }
 
-.outcome-bar-group {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+/* ===== Market 子卡片 ===== */
+.market-subcard {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-top: 10px;
+    transition: border-color 0.2s;
 }
 
-.outcome-bar-header {
+/* 进行中：绿色左边框 */
+.market-subcard.active {
+    border-left-color: var(--green);
+}
+
+/* 已截止：整体变暗 */
+.market-subcard.expired {
+    opacity: 0.55;
+}
+
+.market-subcard-header {
     display: flex;
     justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.market-question {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.5;
+    color: var(--text);
+    flex: 1;
+}
+
+/* 状态标签 */
+.status-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.status-badge.active {
+    background: rgba(76, 175, 80, 0.15);
+    color: var(--green);
+}
+
+.status-badge.expired {
+    background: rgba(136, 153, 170, 0.12);
+    color: var(--text-dim);
+}
+
+/* 元信息行 */
+.market-subcard-meta {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 12px;
+}
+
+.meta-item {
+    display: flex;
+    gap: 4px;
     align-items: baseline;
 }
 
-.outcome-name {
-    font-size: 14px;
+.meta-label {
+    font-size: 11px;
+    color: var(--text-dim);
+}
+
+.meta-value {
+    font-size: 13px;
     font-weight: 600;
     color: var(--text);
-}
-
-.outcome-pct {
-    font-size: 16px;
-    font-weight: 700;
     font-variant-numeric: tabular-nums;
-    color: var(--text);
 }
 
-.outcome-bar-track {
-    height: 12px;
-    background: var(--bg);
-    border-radius: 6px;
+.meta-value.accent { color: var(--accent); }
+
+/* 未截止日期以天蓝色突出 */
+.meta-value.date-active {
+    color: #4fc3f7;
+}
+
+/* 概率条 */
+.market-outcomes {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.outcome-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.outcome-name {
+    width: 36px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.outcome-track {
+    flex: 1;
+    height: 10px;
+    background: var(--bg-input);
+    border-radius: 5px;
     overflow: hidden;
 }
 
-.outcome-bar-fill {
+.outcome-fill {
     height: 100%;
-    border-radius: 6px;
+    border-radius: 5px;
     transition: width 0.4s ease;
 }
 
-/* ===== 描述/背景文本 ===== */
-.card-description,
-.card-context {
+.outcome-pct {
+    width: 48px;
+    font-size: 13px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    text-align: right;
+    flex-shrink: 0;
+}
+
+/* Market 描述 */
+.market-desc {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-dim);
+    margin-top: 8px;
+}
+
+/* ===== 背景信息 ===== */
+.event-context {
     margin-top: 20px;
-    padding-top: 18px;
+    padding-top: 16px;
     border-top: 1px solid var(--border);
 }
 
-.card-description h4,
-.card-context h4 {
+.event-context h4 {
     font-size: 12px;
     color: var(--text-dim);
     text-transform: uppercase;
@@ -305,8 +397,7 @@ body {
     margin-bottom: 8px;
 }
 
-.card-description p,
-.card-context p {
+.event-context p {
     font-size: 13px;
     line-height: 1.7;
     color: var(--text-dim);
@@ -391,28 +482,25 @@ body {
     }
     .topbar-hint { display: none; }
 
-    .search-bar {
-        flex-direction: column;
-    }
+    .search-bar { flex-direction: column; }
+    .search-input-wrap { min-width: 0; }
 
-    .search-input-wrap {
-        min-width: 0;
-    }
-
-    .market-card-full {
+    .event-card-full {
         padding: 20px 16px;
     }
 
-    .card-question {
+    .event-card-title {
         font-size: 17px;
     }
 
-    .card-meta-row {
-        flex-direction: column;
-        gap: 12px;
+    .market-subcard {
+        padding: 12px 14px;
     }
 
-    .pagination {
-        gap: 12px;
+    .market-subcard-meta {
+        flex-direction: column;
+        gap: 4px;
     }
+
+    .pagination { gap: 12px; }
 }

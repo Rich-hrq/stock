@@ -1,4 +1,4 @@
-/** Polymarket 预测市场 — 每 market 一页，翻页浏览 */
+/** Polymarket 预测市场 — 按 event 分组翻页，关键词 + 活跃日期高亮 */
 (function () {
     "use strict";
 
@@ -12,9 +12,9 @@
     const prevBtn = document.getElementById("prevMarket");
     const nextBtn = document.getElementById("nextMarket");
     const pageIndicator = document.getElementById("pageIndicator");
-    const eventBadge = document.getElementById("eventBadge");
 
-    let markets = [];        // 扁平化后的所有 market
+    let events = [];          // 按 event 分组（不再扁平化）
+    let keywords = [];        // 当前搜索词，用于高亮
     let currentIdx = 0;
     let isSearching = false;
 
@@ -35,7 +35,7 @@
         const raw = keywordInput.value.trim();
         if (!raw || isSearching) return;
 
-        const keywords = raw.split(/[,，\s]+/).map((k) => k.trim()).filter(Boolean);
+        keywords = raw.split(/[,，\s]+/).map((k) => k.trim()).filter(Boolean);
         if (keywords.length === 0) return;
 
         isSearching = true;
@@ -60,11 +60,10 @@
                 throw new Error(err.detail || "请求失败");
             }
 
-            const events = await res.json();
-            markets = flatten(events);
+            events = await res.json();
             currentIdx = 0;
 
-            if (markets.length === 0) {
+            if (events.length === 0) {
                 emptyState.innerHTML = "未找到匹配的预测事件";
                 emptyState.style.display = "flex";
                 cardArea.style.display = "none";
@@ -83,76 +82,82 @@
         }
     }
 
-    // ---- 扁平化：每个 market 一条记录，携带父事件信息 ----
-    function flatten(events) {
-        const result = [];
-        for (const ev of events) {
-            for (const m of ev.markets || []) {
-                result.push({
-                    eventTitle: ev.title || "",
-                    eventDesc: ev.description || "",
-                    meta: ev.meta || {},
-                    question: m.question || "",
-                    endDate: m.endDate || "",
-                    description: m.description || "",
-                    outcomePrices: m.outcomePrices || "",
-                    volume: parseFloat(m.volume) || 0,
-                });
-            }
-        }
-        return result;
-    }
-
-    // ---- 渲染当前 market 卡片 ----
+    // ---- 渲染当前 event ----
     function renderCurrent() {
-        if (markets.length === 0) return;
+        if (events.length === 0) return;
 
-        const m = markets[currentIdx];
-        const total = markets.length;
+        const ev = events[currentIdx];
+        const total = events.length;
 
-        // 页面指示器
         pageIndicator.textContent = `${currentIdx + 1} / ${total}`;
-        eventBadge.textContent = m.eventTitle || "—";
-
-        // 上一页/下一页 按钮状态
         prevBtn.disabled = currentIdx === 0;
         nextBtn.disabled = currentIdx === total - 1;
 
-        // 组装卡片 HTML（写入 cardContent，不覆盖翻页控件）
-        cardContent.innerHTML = `
-            <div class="market-card-full">
-                <div class="card-question">${escapeHtml(m.question)}</div>
+        const markets = ev.markets || [];
+        const meta = ev.meta || {};
 
-                <div class="card-meta-row">
-                    <div class="card-meta-item">
-                        <span class="card-meta-label">截止日期</span>
-                        <span class="card-meta-value">${formatDate(m.endDate)}</span>
-                    </div>
-                    <div class="card-meta-item">
-                        <span class="card-meta-label">交易量</span>
-                        <span class="card-meta-value accent">${formatVolume(m.volume)}</span>
-                    </div>
+        cardContent.innerHTML = `
+            <div class="event-card-full">
+                <div class="event-card-header">
+                    <h2 class="event-card-title">${hl(ev.title)}</h2>
+                    ${ev.description
+                        ? `<p class="event-card-desc">${hl(truncate(ev.description, 400))}</p>`
+                        : ""}
                 </div>
 
-                <div class="card-outcomes">
-                    ${renderOutcomeBars(m.outcomePrices)}
+                <div class="markets-section">
+                    <h3 class="markets-heading">
+                        预测市场 <span class="markets-count">${markets.length}</span>
+                        <span class="markets-summary">
+                            （进行中 ${markets.filter(m => isActive(m.endDate)).length}，已截止 ${markets.filter(m => !isActive(m.endDate)).length}）
+                        </span>
+                    </h3>
+                    ${markets.map((m) => renderMarketCard(m)).join("")}
+                </div>
+
+                ${meta.context_description
+                    ? `<div class="event-context">
+                        <h4>背景信息</h4>
+                        <p>${hl(meta.context_description)}</p>
+                        ${meta.context_updated_at
+                            ? `<span class="context-time">更新于 ${formatDate(meta.context_updated_at)}</span>`
+                            : ""}
+                    </div>`
+                    : ""}
+            </div>
+        `;
+    }
+
+    // ---- 渲染单个 market 子卡片 ----
+    function renderMarketCard(m) {
+        const active = isActive(m.endDate);
+        const statusClass = active ? "active" : "expired";
+        const statusText = active ? "进行中" : "已截止";
+
+        return `
+            <div class="market-subcard ${statusClass}">
+                <div class="market-subcard-header">
+                    <span class="market-question">${hl(m.question || "—")}</span>
+                    <span class="status-badge ${statusClass}">${statusText}</span>
+                </div>
+
+                <div class="market-subcard-meta">
+                    <span class="meta-item">
+                        <span class="meta-label">截止</span>
+                        <span class="meta-value ${active ? "date-active" : ""}">${formatDate(m.endDate)}</span>
+                    </span>
+                    <span class="meta-item">
+                        <span class="meta-label">交易量</span>
+                        <span class="meta-value accent">${formatVolume(parseFloat(m.volume) || 0)}</span>
+                    </span>
+                </div>
+
+                <div class="market-outcomes">
+                    ${renderOutcomeBars(m.outcomePrices || "")}
                 </div>
 
                 ${m.description
-                    ? `<div class="card-description">
-                        <h4>市场说明</h4>
-                        <p>${escapeHtml(m.description)}</p>
-                    </div>`
-                    : ""}
-
-                ${m.meta.context_description
-                    ? `<div class="card-context">
-                        <h4>背景信息</h4>
-                        <p>${escapeHtml(m.meta.context_description)}</p>
-                        ${m.meta.context_updated_at
-                            ? `<span class="context-time">更新于 ${formatDate(m.meta.context_updated_at)}</span>`
-                            : ""}
-                    </div>`
+                    ? `<div class="market-desc">${hl(truncate(m.description, 200))}</div>`
                     : ""}
             </div>
         `;
@@ -168,14 +173,12 @@
                 const label = outcomeLabel(i);
                 const color = p > 0.5 ? "var(--green)" : p < 0.5 ? "var(--red)" : "var(--text-dim)";
                 return `
-                    <div class="outcome-bar-group">
-                        <div class="outcome-bar-header">
-                            <span class="outcome-name">${label}</span>
-                            <span class="outcome-pct">${pct}%</span>
+                    <div class="outcome-row">
+                        <span class="outcome-name">${label}</span>
+                        <div class="outcome-track">
+                            <div class="outcome-fill" style="width:${pct}%; background:${color};"></div>
                         </div>
-                        <div class="outcome-bar-track">
-                            <div class="outcome-bar-fill" style="width:${pct}%; background:${color};"></div>
-                        </div>
+                        <span class="outcome-pct">${pct}%</span>
                     </div>
                 `;
             })
@@ -185,16 +188,38 @@
     // ---- 翻页 ----
     function navigate(delta) {
         const newIdx = currentIdx + delta;
-        if (newIdx < 0 || newIdx >= markets.length) return;
+        if (newIdx < 0 || newIdx >= events.length) return;
         currentIdx = newIdx;
         renderCurrent();
     }
 
-    // ---- 工具函数 ----
+    // ========== 高亮 ==========
+
+    /** 对文本做 HTML 转义后高亮所有搜索关键词 */
+    function hl(text) {
+        if (!text) return "";
+        let out = escapeHtml(text);
+        const pattern = keywords
+            .map((k) => escapeRegex(k.trim()))
+            .filter(Boolean)
+            .join("|");
+        if (!pattern) return out;
+        return out.replace(
+            new RegExp(`(${pattern})`, "gi"),
+            '<mark class="kw-highlight">$1</mark>'
+        );
+    }
+
+    function isActive(isoDate) {
+        if (!isoDate) return false;
+        return new Date(isoDate) > new Date();
+    }
+
+    // ========== 工具函数 ==========
+
     function parseOutcomePrices(raw) {
         try {
-            const arr = JSON.parse(raw);
-            return arr.map(parseFloat).filter((n) => !isNaN(n));
+            return JSON.parse(raw).map(parseFloat).filter((n) => !isNaN(n));
         } catch { return []; }
     }
 
@@ -215,9 +240,18 @@
         return d.toISOString().slice(0, 10);
     }
 
+    function truncate(text, max) {
+        if (!text) return "";
+        return text.length > max ? text.slice(0, max) + "…" : text;
+    }
+
     function escapeHtml(str) {
         const div = document.createElement("div");
         div.textContent = str;
         return div.innerHTML;
+    }
+
+    function escapeRegex(s) {
+        return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     }
 })();
