@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Polymarket 预测市场</title>
+    <link rel="stylesheet" href="/css/prediction.css">
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <header class="topbar">
+        <a href="/" class="back-link">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            返回主页
+        </a>
+        <h1 class="topbar-title">Polymarket 预测市场</h1>
+        <span class="topbar-hint">输入关键词，浏览预测市场中事件的隐含概率</span>
+    </header>
+
+    <!-- 搜索栏 -->
+    <div class="search-bar">
+        <div class="search-input-wrap">
+            <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input type="text" id="keywordInput"
+                   value="trump, fed, bitcoin"
+                   placeholder="输入关键词，逗号分隔（如 trump, fed, bitcoin）"
+                   autocomplete="off">
+            <button id="searchPrediction">查询</button>
+        </div>
+        <div class="search-params">
+            <label>上限 <input type="number" id="predLimit" value="500" min="1" max="500"></label>
+            <label>最低交易量($) <input type="number" id="predThreshold" value="100000" min="0" step="10000"></label>
+        </div>
+    </div>
+
+    <!-- 空状态 -->
+    <div class="empty-state" id="emptyState">
+        <div class="empty-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+        </div>
+        <p>输入关键词后点击「查询」<br>查看 Polymarket 上的预测数据</p>
+    </div>
+
+    <!-- 卡片区 -->
+    <div class="card-area" id="cardArea" style="display:none;">
+        <!-- 事件标签 -->
+        <div class="event-badge" id="eventBadge">—</div>
+
+        <!-- Market 卡片 -->
+        <div class="card-wrapper" id="cardWrapper">
+            <div id="cardContent"></div>
+        </div>
+
+        <!-- 翻页控制 -->
+        <div class="pagination">
+            <button class="page-btn" id="prevMarket">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15 18 9 12 15 6"/>
+                </svg>
+                上一个
+            </button>
+
+            <span class="page-indicator" id="pageIndicator">0 / 0</span>
+
+            <button class="page-btn" id="nextMarket">
+                下一个
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9 18 15 12 9 6"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- 键盘提示 -->
+        <div class="keyboard-hint">← → 方向键翻页</div>
+    </div>
+
+    <script src="/js/prediction.js"></script>
+</body>
+</html>

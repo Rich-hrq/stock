@@ -1,0 +1,418 @@
+/* ===== Polymarket 预测市场 — 独立页面 ===== */
+
+:root {
+    --bg: #0f1923;
+    --bg-card: #1a2736;
+    --bg-input: #243447;
+    --text: #e0e6ed;
+    --text-dim: #8899aa;
+    --accent: #4fc3f7;
+    --green: #4caf50;
+    --red: #ef5350;
+    --border: #2a3a4a;
+    --radius: 10px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ===== 顶部导航 ===== */
+.topbar {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    padding: 14px 24px;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+}
+
+.back-link {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 13px;
+    transition: color 0.2s;
+    white-space: nowrap;
+}
+
+.back-link:hover { color: var(--accent); }
+
+.topbar-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--accent);
+}
+
+.topbar-hint {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-left: auto;
+}
+
+/* ===== 搜索栏 ===== */
+.search-bar {
+    padding: 14px 24px;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+}
+
+.search-input-wrap {
+    flex: 1;
+    min-width: 300px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.search-input-wrap:focus-within {
+    border-color: var(--accent);
+}
+
+.search-icon {
+    color: var(--text-dim);
+    flex-shrink: 0;
+}
+
+.search-input-wrap input {
+    flex: 1;
+    padding: 8px 4px;
+    background: none;
+    border: none;
+    color: var(--text);
+    font-size: 14px;
+    outline: none;
+}
+
+.search-input-wrap input::placeholder { color: var(--text-dim); }
+
+#searchPrediction {
+    padding: 8px 24px;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: opacity 0.2s;
+}
+
+#searchPrediction:hover { opacity: 0.85; }
+#searchPrediction:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.search-params {
+    display: flex;
+    gap: 16px;
+}
+
+.search-params label {
+    font-size: 12px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.search-params input[type="number"] {
+    width: 80px;
+    padding: 6px 8px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+/* ===== 空状态 ===== */
+.empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    color: var(--text-dim);
+    padding: 60px 24px;
+    text-align: center;
+    line-height: 1.8;
+    font-size: 14px;
+}
+
+.empty-icon {
+    opacity: 0.3;
+    color: var(--accent);
+}
+
+/* ===== 卡片区 ===== */
+.card-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 24px 12px;
+    overflow-y: auto;
+}
+
+.event-badge {
+    display: inline-block;
+    padding: 4px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+    max-width: 90%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ===== Market 卡片 ===== */
+.card-wrapper {
+    width: 100%;
+    max-width: 700px;
+}
+
+.market-card-full {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px 32px;
+    animation: fadeIn 0.25s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.card-question {
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.5;
+    color: var(--text);
+    margin-bottom: 20px;
+}
+
+.card-meta-row {
+    display: flex;
+    gap: 32px;
+    margin-bottom: 24px;
+}
+
+.card-meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.card-meta-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.card-meta-value {
+    font-size: 16px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+}
+
+.card-meta-value.accent { color: var(--accent); }
+
+/* ===== 概率条 ===== */
+.card-outcomes {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 24px;
+}
+
+.outcome-bar-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.outcome-bar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+}
+
+.outcome-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.outcome-pct {
+    font-size: 16px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+}
+
+.outcome-bar-track {
+    height: 12px;
+    background: var(--bg);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.outcome-bar-fill {
+    height: 100%;
+    border-radius: 6px;
+    transition: width 0.4s ease;
+}
+
+/* ===== 描述/背景文本 ===== */
+.card-description,
+.card-context {
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+}
+
+.card-description h4,
+.card-context h4 {
+    font-size: 12px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.card-description p,
+.card-context p {
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text-dim);
+}
+
+.context-time {
+    display: inline-block;
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--text-dim);
+    opacity: 0.6;
+}
+
+/* ===== 翻页控制 ===== */
+.pagination {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 16px 0;
+}
+
+.page-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s;
+}
+
+.page-btn:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.page-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+.page-indicator {
+    font-size: 14px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    min-width: 60px;
+    text-align: center;
+}
+
+.keyboard-hint {
+    font-size: 11px;
+    color: var(--text-dim);
+    opacity: 0.5;
+    padding-bottom: 16px;
+}
+
+/* ===== 加载指示器 ===== */
+.loading-spinner {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ===== 响应式 ===== */
+@media (max-width: 600px) {
+    .topbar {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .topbar-hint { display: none; }
+
+    .search-bar {
+        flex-direction: column;
+    }
+
+    .search-input-wrap {
+        min-width: 0;
+    }
+
+    .market-card-full {
+        padding: 20px 16px;
+    }
+
+    .card-question {
+        font-size: 17px;
+    }
+
+    .card-meta-row {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .pagination {
+        gap: 12px;
+    }
+}
