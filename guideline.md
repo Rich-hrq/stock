@@ -96,6 +96,48 @@
             后续启动无需重新索引
 ```
 
+### Pipeline D：Polymarket 预测市场数据
+
+```
+用户发送预测查询（POST /api/predict  { keywords, limit, threshold }）
+    │
+    ├─ 1. routers/prediction.py: 接收请求，Pydantic 校验参数
+    │       PredictRequest(keywords, limit, threshold)
+    │
+    ├─ 2. services/polymarket.py: fetch_polymarket_data()
+    │       │
+    │       ├─ 组装查询参数：limit / active / closed / volume_min
+    │       ├─ 通过代理请求 Polymarket Gamma API
+    │       │     GET https://gamma-api.polymarket.com/events
+    │       │
+    │       ├─ 遍历返回的 events，对每个 event：
+    │       │     ├─ 提取 title + description + metadata.context_description 作为 context
+    │       │     ├─ check_relevant(context, keywords): 检测关键词匹配
+    │       │     └─ 匹配成功 → extract(event): 提取核心字段
+    │       │
+    │       └─ 返回 list[dict]：每个元素包含 title / description / markets[] / meta
+    │
+    └─ 3. routers/prediction.py: 返回 JSON 给前端
+            如 API 请求失败 → 返回 502 + 错误详情
+```
+
+**Polymarket API 说明**：
+- Gamma API (`gamma-api.polymarket.com`) 是 Polymarket 的公开数据接口，无需 API Key
+- `active=true&closed=false`：只取活跃中的事件
+- `volume_min`：过滤低交易量事件（单位：美元）
+- 返回的 `markets[].outcomePrices` 是 JSON 字符串数组，需前端自行解析
+
+**关键词过滤逻辑** (`check_relevant`)：
+```python
+# 大小写不敏感的包含匹配
+# 只要 context（标题+描述+元数据）中包含任意一个 keyword，即返回 True
+for k in keywords:
+    for c in context:
+        if k.lower() in c.lower():
+            return True
+return False
+```
+
 ---
 
 ## 二、核心技术点讲解
@@ -252,3 +294,17 @@ chart.setOption(option);
 - `candlestick` 类型直接支持 OHLC 数据
 - 多系列叠加实现布林带 + 唐奇安通道与 K 线共存
 - `axisPointer: { type: "cross" }` 实现十字光标交互
+
+### 10. Polymarket 预测市场
+
+```python
+# Gamma API 是 Polymarket 的公开数据接口，无需 API Key
+url = "https://gamma-api.polymarket.com/events"
+params = {"limit": 500, "active": "true", "closed": "false", "volume_min": 100000}
+response = requests.get(url, params=params, proxies={"http": proxy, "https": proxy})
+```
+
+- 每个事件包含多个子市场（markets），每个市场有不同的到期日和赔率
+- `outcomePrices` 是 JSON 字符串（如 `["0.12", "0.88"]`），表示各结果当前隐含概率
+- `volume` 是美元计价的累计交易量，用于判断市场活跃度
+- 国内访问需设置代理，与 yfinance 共用 `HTTP_PROXY` 配置

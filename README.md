@@ -6,6 +6,7 @@
 - 海龟交易法则技术指标：布林带、ATR/N值、唐奇安通道、趋势判断
 - 自动生成趋势跟踪投资建议
 - 基于原书 PDF 的 RAG 智能问答（LangGraph v3：智能评估 + 选择性扩展 + 多查询融合检索）
+- Polymarket 预测市场数据聚合（按关键词筛选事件，展示市场赔率、成交量等）
 
 ## 目录结构
 
@@ -18,13 +19,15 @@ stock_website/
 │   ├── requirements.txt     # Python 依赖
 │   ├── routers/
 │   │   ├── index_data.py    # 指数数据 API（/api/indices/*）
-│   │   └── chat.py          # RAG 对话 API（/api/chat）
+│   │   ├── chat.py          # RAG 对话 API（/api/chat）
+│   │   └── prediction.py    # 预测市场 API（/api/predict）
 │   ├── services/
 │   │   ├── market_data.py   # yfinance 数据获取 + 缓存 + 代理
 │   │   ├── indicators.py    # 布林带、ATR、唐奇安通道、趋势判断、投资建议
 │   │   └── rag.py           # RAG v1（retrieve → generate）
 │   │   ├── rag_v2.py          # RAG v2（rewrite → judge → 条件路由）
-│   │   └── rag_v3.py          # RAG v3（evaluate → 选择性扩展 → 多查询融合）
+│   │   ├── rag_v3.py          # RAG v3（evaluate → 选择性扩展 → 多查询融合）
+│   │   └── polymarket.py     # Polymarket API 数据获取与过滤
 │   ├── knowledge/
 │   │   ├── ingest.py          # PDF → 切片 → 向量化 → ChromaDB（一次性脚本）
 │   │   ├── test_rag.py        # v1/v2/v3 对比测试脚本
@@ -178,6 +181,7 @@ lsof -ti:8000 | xargs kill 2>/dev/null; sleep 1
 | GET | `/api/indices` | 返回可用指数列表 |
 | GET | `/api/indices/{symbol}/analysis?start_date=...&end_date=...` | 完整技术分析（OHLCV + 指标 + 建议） |
 | POST | `/api/chat` | RAG 对话（body: `{message, history?}`） |
+| POST | `/api/predict` | Polymarket 预测数据（body: `{keywords, limit?, threshold?}`） |
 | GET | `/api/health` | 健康检查 |
 
 ## 技术架构
@@ -187,6 +191,8 @@ lsof -ti:8000 | xargs kill 2>/dev/null; sleep 1
     │                      │                    │
     │                      ├──→ /api/chat ──→ LangGraph ──→ ChromaDB ──→ LLM
     │                      │                    │
+    │                      ├──→ /api/predict ──→ Polymarket API
+    │                      │
     └──← 静态文件（HTML/CSS/JS）              ├─ v1: retrieve → generate
                                                ├─ v2: rewrite → retrieve → judge → 条件路由
                                                └─ v3: evaluate → 选择性扩展 → 多查询融合 → generate

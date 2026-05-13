@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import STATIC_DIR
-from .routers import index_data, chat
+from .routers import index_data, chat, prediction
 
 app = FastAPI(
     title="美股指数波动分析 & 海龟交易法则问答",
@@ -27,8 +27,10 @@ app.add_middleware(
 )
 
 # API 路由
+# 把 routers 文件中的接口注册进来
 app.include_router(index_data.router)
 app.include_router(chat.router)
+app.include_router(prediction.router)
 
 
 @app.get("/api/health")
