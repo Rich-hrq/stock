@@ -8,7 +8,7 @@ PROJECT_ROOT = Path(__file__).parent.parent  # stock_website/
 BACKEND_DIR = Path(__file__).parent           # stock_website/backend/
 KNOWLEDGE_DIR = BACKEND_DIR / "knowledge"
 CHROMA_DB_DIR = KNOWLEDGE_DIR / "chroma_db"
-STATIC_DIR = BACKEND_DIR / "static"
+STATIC_DIR = PROJECT_ROOT / "frontend"
 PDF_PATH = PROJECT_ROOT.parent / "海龟交易法则.pdf"
 
 # ---- Anthropic API 配置 ----

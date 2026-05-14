@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>新闻资讯 - The Guardian</title>
+    <link rel="stylesheet" href="/css/news.css">
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <header class="topbar">
+        <a href="/" class="back-link">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            返回主页
+        </a>
+        <h1 class="topbar-title">新闻资讯</h1>
+        <span class="topbar-hint">来自 The Guardian 的最新报道</span>
+        <button id="fetchNews" class="fetch-btn">获取新闻</button>
+    </header>
+
+    <!-- 加载/空状态 -->
+    <div class="empty-state" id="emptyState">
+        <div class="empty-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M19 20H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h10l5 5v11a2 2 0 0 1-2 2z"/>
+                <polyline points="12 18 12 12 15 15"/>
+                <polyline points="9 12 9 18"/>
+            </svg>
+        </div>
+        <p>点击右上角「获取新闻」按钮<br>拉取 The Guardian 最新报道</p>
+    </div>
+
+    <!-- 新闻列表 -->
+    <main class="news-area" id="newsArea" style="display:none;">
+        <div class="news-meta" id="newsMeta"></div>
+        <div class="news-list" id="newsList"></div>
+    </main>
+
+    <script src="/js/news.js"></script>
+</body>
+</html>
