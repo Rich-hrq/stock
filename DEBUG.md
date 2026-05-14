@@ -167,3 +167,26 @@ cd /Users/hrq/Coding/stock/stock_website
 - 如果页面已有 `<base>` 标签，需用正则替换而非重复插入（`services/proxy.py` 已处理）
 - Guardian CDN 资源（`assets.guim.co.uk`、`i.guim.co.uk`）使用绝对 URL，不受 `<base>` 影响，浏览器直接请求
 - 域名白名单仅校验 `netloc`（`www.theguardian.com`），不含子域名变体；如需支持 `amp.theguardian.com` 等，应在白名单中追加
+
+---
+
+## 统计指标用 close 系列代替完整 OHLC 四价
+
+**现象**：1 天视图明明跌了，涨跌幅却显示绿色正数；振幅数值偏小。
+
+**原因**：`index_data.py` 中统计指标的计算只用 `close` 列：
+```python
+close = df["close"]
+start_price = close.iloc[0]           # 起价 = 第一小时收盘，不是开盘
+max_price = close.max()               # 最高价 = 最高收盘价，漏了上影线
+min_price = close.min()               # 最低价 = 最低收盘价，漏了下影线
+```
+
+**解决**：使用完整 OHLC 四价：
+```python
+start_price = df["open"].iloc[0]      # 起价 = 第一个开盘价
+max_price   = df["high"].max()        # 最高价 = 真实日内最高
+min_price   = df["low"].min()         # 最低价 = 真实日内最低
+```
+
+涨跌幅、振幅、最高/最低日期也相应从 `high`/`low` 列取值。

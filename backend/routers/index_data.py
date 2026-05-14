@@ -54,11 +54,12 @@ async def get_index_analysis(
     atr_series = compute_atr(df)
     donchian = compute_donchian(df)
 
-    # 统计指标（复用与现有项目一致的逻辑）
-    close = df["close"]
-    start_price = close.iloc[0]
-    end_price = close.iloc[-1]
-    max_price, min_price = close.max(), close.min()
+    # 统计指标
+    # 使用 OHLC 完整四价：开盘为起点，最高/最低反映真实日内极值
+    start_price = df["open"].iloc[0]
+    end_price = df["close"].iloc[-1]
+    max_price = df["high"].max()
+    min_price = df["low"].min()
     total_return = (end_price - start_price) / start_price * 100
     amplitude = (max_price - min_price) / start_price * 100
 
@@ -66,9 +67,9 @@ async def get_index_analysis(
         "起价": round(start_price, 2),
         "收价": round(end_price, 2),
         "最高价": round(max_price, 2),
-        "最高日期": str(close.idxmax().date()),
+        "最高日期": str(df["high"].idxmax().date()),
         "最低价": round(min_price, 2),
-        "最低日期": str(close.idxmin().date()),
+        "最低日期": str(df["low"].idxmin().date()),
         "区间涨跌幅": f"{total_return:+.2f}%",
         "区间振幅": f"{amplitude:+.2f}%",
         "当前趋势": judge_trend(df, donchian),
