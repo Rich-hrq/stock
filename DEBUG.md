@@ -136,3 +136,17 @@ else:
 **原因**：改写添加了 "突破 做多 做空" 等关键词，改变了语义重心，导致向量检索偏向不同方向
 
 **解决**：v3 方案——先评估问题是否已精确，精确则跳过改写步骤
+
+---
+
+## uvicorn 启动目录错误
+
+**现象**：从 `/stock/` 目录执行 `uvicorn backend.main:app` 报 `ModuleNotFoundError: No module named 'backend'`
+
+**原因**：`backend` 包在 `stock_website/` 目录下，uvicorn 需要在包含 `backend/` 的目录中运行，Python 才能找到该模块
+
+**解决**：
+```bash
+cd /Users/hrq/Coding/stock/stock_website
+.stock/bin/python -m uvicorn backend.main:app --reload --port 8000
+```

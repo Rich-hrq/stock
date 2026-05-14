@@ -7,6 +7,7 @@
 - 自动生成趋势跟踪投资建议
 - 基于原书 PDF 的 RAG 智能问答（LangGraph v3：智能评估 + 选择性扩展 + 多查询融合检索）
 - Polymarket 预测市场浏览（独立页面，按事件分组翻页，关键词/活跃日期高亮，概率条可视化）
+- The Guardian 新闻资讯（独立页面，爬取最新报道，按分类标签展示，支持原文链接跳转）
 
 ## 目录结构
 
@@ -20,14 +21,16 @@ stock_website/
 │   ├── routers/
 │   │   ├── index_data.py    # 指数数据 API（/api/indices/*）
 │   │   ├── chat.py          # RAG 对话 API（/api/chat）
-│   │   └── prediction.py    # 预测市场 API（/api/predict）
+│   │   ├── prediction.py    # 预测市场 API（/api/predict）
+│   │   └── guardian.py      # 新闻爬取 API（/api/guardian_news）
 │   ├── services/
 │   │   ├── market_data.py   # yfinance 数据获取 + 缓存 + 代理
 │   │   ├── indicators.py    # 布林带、ATR、唐奇安通道、趋势判断、投资建议
 │   │   └── rag.py           # RAG v1（retrieve → generate）
 │   │   ├── rag_v2.py          # RAG v2（rewrite → judge → 条件路由）
 │   │   ├── rag_v3.py          # RAG v3（evaluate → 选择性扩展 → 多查询融合）
-│   │   └── polymarket.py     # Polymarket API 数据获取与过滤
+│   │   ├── polymarket.py     # Polymarket API 数据获取与过滤
+│   │   └── guardian_news.py  # The Guardian 新闻爬取（BeautifulSoup）
 │   ├── knowledge/
 │   │   ├── ingest.py          # PDF → 切片 → 向量化 → ChromaDB（一次性脚本）
 │   │   ├── test_rag.py        # v1/v2/v3 对比测试脚本
@@ -35,15 +38,18 @@ stock_website/
 │   └── static/              # 前端静态文件
 │       ├── index.html       # 主页（指数分析）
 │       ├── prediction.html  # 预测市场页
+│       ├── news.html        # 新闻资讯页
 │       ├── css/
 │       │   ├── styles.css   # 主页样式
-│       │   └── prediction.css # 预测市场页样式
+│       │   ├── prediction.css # 预测市场页样式
+│       │   └── news.css      # 新闻资讯页样式
 │       └── js/
 │           ├── app.js       # 应用入口，状态管理
 │           ├── charts.js    # ECharts K线图 + 布林带 + 唐奇安
 │           ├── indicators.js # 侧边面板：统计、指标、建议
 │           ├── chat.js      # RAG 聊天对话框
 │           └── prediction.js # 预测市场查询与渲染
+│           └── news.js       # 新闻抓取与渲染
 ├── README.md                # 项目说明
 ├── guideline.md             # 代码知识讲解 + 数据流 pipeline
 └── DEBUG.md                 # 踩坑记录
@@ -113,6 +119,7 @@ all_proxy=http://127.0.0.1:7897 uvicorn backend.main:app --reload --port 8000
 
 - 主页（指数分析）：http://localhost:8000
 - 预测市场页：http://localhost:8000/prediction.html
+- 新闻资讯页：http://localhost:8000/news.html
 - API 文档（Swagger）：http://localhost:8000/docs
 
 ---
@@ -187,6 +194,7 @@ lsof -ti:8000 | xargs kill 2>/dev/null; sleep 1
 | GET | `/api/indices/{symbol}/analysis?start_date=...&end_date=...` | 完整技术分析（OHLCV + 指标 + 建议） |
 | POST | `/api/chat` | RAG 对话（body: `{message, history?}`） |
 | POST | `/api/predict` | Polymarket 预测数据（body: `{keywords, limit?, threshold?}`） |
+| POST | `/api/guardian_news` | The Guardian 新闻爬取（无需参数） |
 | GET | `/api/health` | 健康检查 |
 
 ## 技术架构
@@ -197,6 +205,7 @@ lsof -ti:8000 | xargs kill 2>/dev/null; sleep 1
     │                      ├──→ /api/chat ──→ LangGraph ──→ ChromaDB ──→ LLM
     │                      │                    │
     │                      ├──→ /api/predict ──→ Polymarket API
+    │                      ├──→ /api/guardian_news ──→ The Guardian
     │                      │
     └──← 静态文件（HTML/CSS/JS）              ├─ v1: retrieve → generate
                                                ├─ v2: rewrite → retrieve → judge → 条件路由

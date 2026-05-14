@@ -295,6 +295,43 @@ chart.setOption(option);
 - 多系列叠加实现布林带 + 唐奇安通道与 K 线共存
 - `axisPointer: { type: "cross" }` 实现十字光标交互
 
+### Pipeline E：The Guardian 新闻抓取
+
+```
+用户打开新闻页面（http://localhost:8000/news.html）或点击「获取新闻」
+    │
+    ├─ 1. news.js 页面加载时自动调用 POST /api/guardian_news
+    │
+    ├─ 2. routers/guardian.py: 接收请求
+    │
+    ├─ 3. services/guardian_news.py: scrape_guardian_news()
+    │       │
+    │       ├─ 通过代理请求 https://www.theguardian.com/us
+    │       ├─ BeautifulSoup HTML 解析
+    │       ├─ 遍历所有 <a> 标签，提取 href + 文本
+    │       ├─ 过滤规则：
+    │       │   ├─ 标题长度 10-200 字符
+    │       │   ├─ 排除功能页链接（/preference/ /signin /subscribe 等）
+    │       │   └─ 只保留链接中包含当前年份（如 /2026/）的新闻
+    │       ├─ 去重（按 link 去重）
+    │       └─ 返回 [{title, link}, ...]
+    │
+    └─ 4. news.js: renderNews(items)
+            ├─ 从每个 item.link 提取分类: link.split("/")[3]
+            ├─ 渲染分类标签：【CATEGORY】橙色徽章
+            ├─ 渲染标题 + 编号
+            └─ 渲染"查看原文"外链按钮（target="_blank"）
+```
+
+**分类提取逻辑**：
+```javascript
+// 例: https://www.theguardian.com/world/2026/may/14/some-article
+// parts = ["https:", "", "www.theguardian.com", "world", "2026", "may", "14", "..."]
+// parts[3] = "world" → 显示为 【WORLD】
+const parts = item.link.split("/");
+const category = parts.length > 3 ? parts[3] : "";
+```
+
 ### 10. Polymarket 预测市场
 
 ```python
@@ -308,3 +345,21 @@ response = requests.get(url, params=params, proxies={"http": proxy, "https": pro
 - `outcomePrices` 是 JSON 字符串（如 `["0.12", "0.88"]`），表示各结果当前隐含概率
 - `volume` 是美元计价的累计交易量，用于判断市场活跃度
 - 国内访问需设置代理，与 yfinance 共用 `HTTP_PROXY` 配置
+
+### 11. BeautifulSoup 网页爬虫
+
+```python
+# BeautifulSoup 将 HTML 文本解析为 DOM 树，支持 CSS 选择器风格的查找
+soup = BeautifulSoup(response.text, "html.parser")
+
+# 提取所有 <a> 标签（超链接）
+for article in soup.find_all("a", href=True):
+    href = article.get("href")       # 链接地址
+    title = article.get_text(strip=True)  # 链接的可见文本（去掉空白）
+```
+
+关键注意点：
+- `get_text(strip=True)` 获取 `<a>` 标签内的纯文本，但可能包含 The Guardian 的版块标签（如 `Full report</span>Xi warns Trump...`），导致标题前缀不干净
+- 链接可能是相对路径（如 `/world/2026/...`），需补全为绝对 URL
+- 新闻链接的 URL 路径格式：`/section/year/month/day/slug`，其中 `section`（parts[3]）即分类名，前端据此生成 `【SECTION】` 标签
+- `response.raise_for_status()` 在 HTTP 状态码非 2xx 时抛出异常，实现统一错误处理
