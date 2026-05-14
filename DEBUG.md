@@ -214,3 +214,26 @@ python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 &
 ```
 
 **教训**：长时间运行的服务若未开启 `--reload`，merge 或 pull 新代码后需要手动重启。
+
+---
+
+## 统计指标用 close 系列代替完整 OHLC 四价
+
+**现象**：1 天视图明明跌了，涨跌幅却显示绿色正数；振幅数值偏小。
+
+**原因**：`index_data.py` 中统计指标的计算只用 `close` 列：
+```python
+close = df["close"]
+start_price = close.iloc[0]           # 起价 = 第一小时收盘，不是开盘
+max_price = close.max()               # 最高价 = 最高收盘价，漏了上影线
+min_price = close.min()               # 最低价 = 最低收盘价，漏了下影线
+```
+
+**解决**：使用完整 OHLC 四价：
+```python
+start_price = df["open"].iloc[0]      # 起价 = 第一个开盘价
+max_price   = df["high"].max()        # 最高价 = 真实日内最高
+min_price   = df["low"].min()         # 最低价 = 真实日内最低
+```
+
+涨跌幅、振幅、最高/最低日期也相应从 `high`/`low` 列取值。
