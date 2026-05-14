@@ -191,3 +191,26 @@ cd /Users/hrq/Coding/stock/stock_website
 - 如果页面已有 `<base>` 标签，需用正则替换而非重复插入（`services/proxy.py` 已处理）
 - Guardian CDN 资源（`assets.guim.co.uk`、`i.guim.co.uk`）使用绝对 URL，不受 `<base>` 影响，浏览器直接请求
 - 域名白名单仅校验 `netloc`（`www.theguardian.com`），不含子域名变体；如需支持 `amp.theguardian.com` 等，应在白名单中追加
+
+---
+
+## Git merge 后 uvicorn 未重启导致 404
+
+**现象**：`git merge` 后重新加载 nginx，所有页面返回 404，但 `/api/health` 和 `/docs` 正常。
+
+**原因**：uvicorn 启动时未加 `--reload` 参数，进程常驻内存，加载的是旧代码。本次 merge 中 `config.py` 的 `STATIC_DIR` 从 `backend/static/`（已删除）变更为 `frontend/`，旧进程仍查找不存在的目录，所有静态文件请求都返回 404。
+
+**解决**：
+```bash
+# 1. 找到 uvicorn 进程并杀死
+pkill -f "uvicorn backend.main"
+
+# 2. 确认端口释放
+lsof -ti:8000 | xargs kill -9
+
+# 3. 用正确的 conda 环境重启（uvicorn 装在 stock 环境，非 base）
+conda activate stock
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 &
+```
+
+**教训**：长时间运行的服务若未开启 `--reload`，merge 或 pull 新代码后需要手动重启。
