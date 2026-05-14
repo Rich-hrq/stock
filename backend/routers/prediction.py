@@ -1,12 +1,7 @@
 from fastapi import APIRouter, HTTPException
+
+from ..schemas import PredictRequest
 from ..services.polymarket import fetch_polymarket_data
-from pydantic import BaseModel
-
-
-class PredictRequest(BaseModel):
-    keywords: list[str] = ["nasdaq", "^ndx", "s&p500", "dow jones"]
-    limit: int = 500
-    threshold: int = 100000
 
 
 router = APIRouter(prefix="/api", tags=["predict"])

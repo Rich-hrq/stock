@@ -13,46 +13,49 @@
 
 ```
 stock_website/
-├── backend/
+├── frontend/                  # 前端项目（纯静态 HTML/CSS/JS）
+│   ├── index.html            # 主页（指数分析）
+│   ├── prediction.html       # 预测市场页
+│   ├── news.html             # 新闻资讯页
+│   ├── css/
+│   │   ├── styles.css        # 主页样式
+│   │   ├── prediction.css    # 预测市场页样式
+│   │   └── news.css          # 新闻资讯页样式
+│   └── js/
+│       ├── app.js            # 应用入口，状态管理
+│       ├── charts.js         # ECharts K线图 + 布林带 + 唐奇安
+│       ├── indicators.js     # 侧边面板：统计、指标、建议
+│       ├── chat.js           # RAG 聊天对话框
+│       ├── prediction.js     # 预测市场查询与渲染
+│       └── news.js           # 新闻抓取与渲染
+├── backend/                   # 后端项目（FastAPI）
 │   ├── __init__.py           # Python 包标识
-│   ├── main.py              # FastAPI 应用入口
-│   ├── config.py            # 全局配置（API密钥、指标参数等）
-│   ├── requirements.txt     # Python 依赖
+│   ├── main.py               # FastAPI 应用入口
+│   ├── config.py             # 全局配置（API密钥、指标参数、路径等）
+│   ├── schemas.py            # Pydantic 请求/响应模型（接口格式定义）
+│   ├── requirements.txt      # Python 依赖
 │   ├── routers/
-│   │   ├── index_data.py    # 指数数据 API（/api/indices/*）
-│   │   ├── chat.py          # RAG 对话 API（/api/chat）
-│   │   ├── prediction.py    # 预测市场 API（/api/predict）
-│   │   └── guardian.py      # 新闻爬取 API（/api/guardian_news）
+│   │   ├── __init__.py
+│   │   ├── index_data.py     # 指数数据 API（/api/indices/*）
+│   │   ├── chat.py           # RAG 对话 API（/api/chat）
+│   │   ├── prediction.py     # 预测市场 API（/api/predict）
+│   │   └── guardian.py       # 新闻爬取 API（/api/guardian_news）
 │   ├── services/
-│   │   ├── market_data.py   # yfinance 数据获取 + 缓存 + 代理
-│   │   ├── indicators.py    # 布林带、ATR、唐奇安通道、趋势判断、投资建议
-│   │   └── rag.py           # RAG v1（retrieve → generate）
-│   │   ├── rag_v2.py          # RAG v2（rewrite → judge → 条件路由）
-│   │   ├── rag_v3.py          # RAG v3（evaluate → 选择性扩展 → 多查询融合）
+│   │   ├── __init__.py
+│   │   ├── market_data.py    # yfinance 数据获取 + 缓存 + 代理
+│   │   ├── indicators.py     # 布林带、ATR、唐奇安通道、趋势判断、投资建议
 │   │   ├── polymarket.py     # Polymarket API 数据获取与过滤
-│   │   └── guardian_news.py  # The Guardian 新闻爬取（BeautifulSoup）
-│   ├── knowledge/
-│   │   ├── ingest.py          # PDF → 切片 → 向量化 → ChromaDB（一次性脚本）
-│   │   ├── test_rag.py        # v1/v2/v3 对比测试脚本
-│   │   └── chroma_db/         # ChromaDB 持久化向量库（.gitignore）
-│   └── static/              # 前端静态文件
-│       ├── index.html       # 主页（指数分析）
-│       ├── prediction.html  # 预测市场页
-│       ├── news.html        # 新闻资讯页
-│       ├── css/
-│       │   ├── styles.css   # 主页样式
-│       │   ├── prediction.css # 预测市场页样式
-│       │   └── news.css      # 新闻资讯页样式
-│       └── js/
-│           ├── app.js       # 应用入口，状态管理
-│           ├── charts.js    # ECharts K线图 + 布林带 + 唐奇安
-│           ├── indicators.js # 侧边面板：统计、指标、建议
-│           ├── chat.js      # RAG 聊天对话框
-│           └── prediction.js # 预测市场查询与渲染
-│           └── news.js       # 新闻抓取与渲染
-├── README.md                # 项目说明
-├── guideline.md             # 代码知识讲解 + 数据流 pipeline
-└── DEBUG.md                 # 踩坑记录
+│   │   ├── guardian_news.py  # The Guardian 新闻爬取（BeautifulSoup）
+│   │   ├── rag.py            # RAG v1（retrieve → generate）
+│   │   ├── rag_v2.py         # RAG v2（rewrite → judge → 条件路由）
+│   │   └── rag_v3.py         # RAG v3（evaluate → 选择性扩展 → 多查询融合）
+│   └── knowledge/
+│       ├── ingest.py         # PDF → 切片 → 向量化 → ChromaDB（一次性脚本）
+│       ├── test_rag.py       # v1/v2/v3 对比测试脚本
+│       └── chroma_db/        # ChromaDB 持久化向量库（.gitignore）
+├── README.md                 # 项目说明
+├── guideline.md              # 代码知识讲解 + 数据流 pipeline
+└── DEBUG.md                  # 踩坑记录
 ```
 
 ## 环境依赖
@@ -207,7 +210,7 @@ lsof -ti:8000 | xargs kill 2>/dev/null; sleep 1
     │                      ├──→ /api/predict ──→ Polymarket API
     │                      ├──→ /api/guardian_news ──→ The Guardian
     │                      │
-    └──← 静态文件（HTML/CSS/JS）              ├─ v1: retrieve → generate
+    └──← 前端静态文件（HTML/CSS/JS）              ├─ v1: retrieve → generate
                                                ├─ v2: rewrite → retrieve → judge → 条件路由
                                                └─ v3: evaluate → 选择性扩展 → 多查询融合 → generate
 ```

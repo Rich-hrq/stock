@@ -150,3 +150,11 @@ else:
 cd /Users/hrq/Coding/stock/stock_website
 .stock/bin/python -m uvicorn backend.main:app --reload --port 8000
 ```
+
+---
+
+## 前后端分离重构后路径注意事项
+
+- 前端文件位于 `frontend/`，后端通过 `config.py` 的 `STATIC_DIR = PROJECT_ROOT / "frontend"` 托管
+- 前端页面中的资源引用（CSS/JS）使用绝对路径如 `/css/styles.css`、`/js/app.js`，不受目录名变更影响
+- `schemas.py` 存放所有 Pydantic 请求/响应模型，新增 API 时应先在 schemas.py 中定义模型，再在 routers 中引用

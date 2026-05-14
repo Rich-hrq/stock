@@ -11,7 +11,7 @@
 ```
 用户打开页面（http://localhost:8000）
     │
-    ├─ 1. FastAPI 返回 static/index.html
+    ├─ 1. FastAPI 返回 frontend/index.html（通过 StaticFiles 托管）
     │       前端加载 ECharts CDN 和各 JS 模块
     │
     ├─ 2. app.js 初始化 → GET /api/indices
@@ -142,7 +142,7 @@ return False
 
 ## 二、核心技术点讲解
 
-### 1. FastAPI 的路由与依赖
+### 1. FastAPI 的路由与 Pydantic 模型
 
 ```python
 # 路由通过 APIRouter 组织，按功能分模块
@@ -156,6 +156,38 @@ async def get_index_analysis(...):  # async 允许并发处理请求
 - `APIRouter`：将相关接口分组，挂载到 `app.include_router()`
 - `async def`：FastAPI 原生支持异步，等待 I/O（网络请求/数据库查询）时不阻塞其他请求
 - `Query()` 参数自动生成 OpenAPI 文档
+
+**Pydantic 模型与 schemas.py**：
+
+本项目将所有 API 的请求/响应模型统一存放在 `backend/schemas.py` 中：
+
+```python
+# schemas.py — 接口格式的"单一真相来源"
+from pydantic import BaseModel
+
+class ChatRequest(BaseModel):
+    message: str
+    history: list[dict] | None = None
+
+class ChatResponse(BaseModel):
+    answer: str
+    sources: list[dict]
+```
+
+路由器通过相对导入引用：
+```python
+from ..schemas import ChatRequest, ChatResponse
+
+@router.post("/chat", response_model=ChatResponse)
+async def chat(req: ChatRequest):
+    ...
+```
+
+这样设计的好处：
+- **统一管理**：所有接口格式在一处定义，便于查阅和维护
+- **前后端约定清晰**：前端只需看 `schemas.py` 即可了解所有 API 的请求/响应格式
+- **自动校验与文档**：FastAPI 自动根据 Pydantic 模型生成 JSON Schema 和 Swagger 文档
+- **减少重复**：避免在多个 router 文件中分散定义模型
 
 ### 2. yfinance 数据获取
 
