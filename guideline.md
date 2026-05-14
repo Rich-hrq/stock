@@ -352,7 +352,7 @@ chart.setOption(option);
             ├─ 从每个 item.link 提取分类: link.split("/")[3]
             ├─ 渲染分类标签：【CATEGORY】橙色徽章
             ├─ 渲染标题 + 编号
-            └─ 渲染"查看原文"外链按钮（target="_blank"）
+            └─ 渲染"查看原文"按钮（href="/api/proxy?url=..."）
 ```
 
 **分类提取逻辑**：
@@ -363,6 +363,56 @@ chart.setOption(option);
 const parts = item.link.split("/");
 const category = parts.length > 3 ? parts[3] : "";
 ```
+
+### Pipeline F：Guardian 反向代理
+
+```
+用户点击新闻「查看原文」
+    │
+    ├─ 1. news.js: href="/api/proxy?url=${encodeURIComponent(item.link)}"
+    │       新标签页打开
+    │
+    ├─ 2. routers/proxy.py: GET /api/proxy?url=...
+    │       从 query string 提取 url 参数
+    │
+    ├─ 3. services/proxy.py: fetch_page(url)
+    │       │
+    │       ├─ urlparse(url).netloc → 域名白名单校验
+    │       │   ├─ www.theguardian.com → 放行
+    │       │   └─ 其他域名 → ValueError → 403 Forbidden
+    │       │
+    │       ├─ requests.get(url, headers, proxies) 通过代理请求 Guardian
+    │       ├─ 注入 <base href="https://www.theguardian.com"> 到 <head>
+    │       │   ├─ 页面已有 <base> → 用正则替换
+    │       │   └─ 没有 → <head> 后插入
+    │       └─ 返回修改后的 HTML
+    │
+    └─ 4. 浏览器收到 HTML
+            ├─ <base> 标签生效，所有相对路径资源自动解析为 Guardian 绝对 URL
+            ├─ CSS / JS / 图片由浏览器直接向 Guardian 请求（不走后端代理）
+            └─ 用户看到完整的 Guardian 原始页面
+```
+
+**`<base>` 标签原理**：
+```html
+<!-- 后端注入到 <head> 中 -->
+<base href="https://www.theguardian.com">
+
+<!-- 页面中的相对路径 -->
+<img src="/img/photo.jpg">
+<!-- 浏览器自动解析为 https://www.theguardian.com/img/photo.jpg -->
+```
+
+这样后端只需代理 HTML 文档本身（几十到几百 KB），CSS/JS/图片等子资源由浏览器自行请求。
+
+**安全设计 — 域名白名单**：
+```python
+parsed = urlparse(url)
+if parsed.netloc != "www.theguardian.com":
+    raise ValueError(f"不允许的域名: {parsed.netloc}")
+```
+- 防止被滥用为开放代理（别人用你的服务器访问任意网站）
+- 防止 SSRF 攻击（访问 127.0.0.1、169.254.169.254 等内网地址）
 
 ### 10. Polymarket 预测市场
 

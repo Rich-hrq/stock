@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 
 from .config import STATIC_DIR
-from .routers import index_data, chat, prediction, guardian
+from .routers import index_data, chat, prediction, guardian, proxy
 
 app = FastAPI(
     title="美股指数波动分析 & 海龟交易法则问答",
@@ -33,6 +33,7 @@ app.include_router(index_data.router)
 app.include_router(chat.router)
 app.include_router(prediction.router)
 app.include_router(guardian.router)
+app.include_router(proxy.router)
 
 
 @app.get("/api/health")

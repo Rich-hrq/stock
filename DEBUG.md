@@ -158,3 +158,12 @@ cd /Users/hrq/Coding/stock/stock_website
 - 前端文件位于 `frontend/`，后端通过 `config.py` 的 `STATIC_DIR = PROJECT_ROOT / "frontend"` 托管
 - 前端页面中的资源引用（CSS/JS）使用绝对路径如 `/css/styles.css`、`/js/app.js`，不受目录名变更影响
 - `schemas.py` 存放所有 Pydantic 请求/响应模型，新增 API 时应先在 schemas.py 中定义模型，再在 routers 中引用
+
+---
+
+## 反向代理 `<base>` 标签方案注意事项
+
+- `<base>` 标签只影响**相对路径**（`/css/main.css`），不影响绝对 URL（`https://...`）和协议相对 URL（`//cdn.example.com/...`）
+- 如果页面已有 `<base>` 标签，需用正则替换而非重复插入（`services/proxy.py` 已处理）
+- Guardian CDN 资源（`assets.guim.co.uk`、`i.guim.co.uk`）使用绝对 URL，不受 `<base>` 影响，浏览器直接请求
+- 域名白名单仅校验 `netloc`（`www.theguardian.com`），不含子域名变体；如需支持 `amp.theguardian.com` 等，应在白名单中追加

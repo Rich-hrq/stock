@@ -81,7 +81,7 @@
                     <div class="news-content">
                         <h2 class="news-title">${categoryHtml}${escapeHtml(item.title)}</h2>
                     </div>
-                    <a href="${escapeHtml(item.link)}" class="news-link" target="_blank" rel="noopener">
+                    <a href="/api/proxy?url=${encodeURIComponent(item.link)}" class="news-link" target="_blank" rel="noopener">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
                             <polyline points="15 3 21 3 21 9"/>
