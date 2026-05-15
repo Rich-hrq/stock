@@ -516,3 +516,109 @@ for article in soup.find_all("a", href=True):
 - 链接可能是相对路径（如 `/world/2026/...`），需补全为绝对 URL
 - 新闻链接的 URL 路径格式：`/section/year/month/day/slug`，其中 `section`（parts[3]）即分类名，前端据此生成 `【SECTION】` 标签
 - `response.raise_for_status()` 在 HTTP 状态码非 2xx 时抛出异常，实现统一错误处理
+
+### Pipeline H：持仓记录（注册/登录 + 交易 + 盈亏汇总）
+
+```
+用户打开持仓页面（http://localhost:8000/portfolio.html）
+    │
+    ├─ 1. portfolio.js 检查 localStorage 中的 JWT Token
+    │       ├─ 有 Token → 调用 GET /api/auth/me 验证是否过期
+    │       │              └─ 过期 → 清除 Token，显示登录表单
+    │       └─ 无 Token → 显示登录/注册表单
+    │
+    ├─ 2. 注册流程：
+    │       POST /api/auth/register  { username, password }
+    │       │
+    │       ├─ routers/auth.py: 校验（用户名 3-20 字符，密码 ≥6 位）
+    │       ├─ 查重：SELECT FROM users WHERE username = ?
+    │       │   └─ 已存在 → 409（用户名已存在）
+    │       ├─ hash_password(): bcrypt.hashpw(password.encode(), gensalt())
+    │       ├─ INSERT INTO users (username, password_hash, created_at)
+    │       └─ 返回 JWT Token（7 天有效期，HS256 签名）
+    │
+    ├─ 3. 登录流程：
+    │       POST /api/auth/login  { username, password }
+    │       │
+    │       ├─ routers/auth.py: 查询用户 → 不存在 → 401（用户名或密码错误）
+    │       ├─ verify_password(): bcrypt.checkpw(plain.encode(), hashed.encode())
+    │       │   └─ 不匹配 → 401
+    │       └─ 返回 JWT Token
+    │
+    ├─ 4. 交易记录：
+    │       POST /api/portfolio/transactions  { symbol, direction, trade_date, amount_cny }
+    │       Header: Authorization: Bearer <token>
+    │       │
+    │       ├─ routers/portfolio.py: get_current_user() 解析 Token → 获取 User
+    │       ├─ services/market_data.py: yfinance 查询交易日收盘价
+    │       ├─ services/exchange_rate.py: open.er-api.com 查询当日 USD/CNY 汇率
+    │       │   └─ 缓存 1 小时，避免频繁调用外部 API
+    │       ├─ 计算：usd_equivalent = amount_cny / rate, shares = usd / close_price
+    │       ├─ INSERT INTO transactions (...)
+    │       └─ 返回完整交易记录
+    │
+    └─ 5. 持仓汇总：
+            GET /api/portfolio/summary
+            Header: Authorization: Bearer <token>
+            │
+            ├─ routers/portfolio.py: 查询该用户所有交易记录
+            ├─ 按 symbol 分组，加权平均成本法计算：
+            │   ├─ 买入 → 累加 shares 和 total_cost
+            │   ├─ 卖出 → 按比例减少 shares，结算已实现盈亏
+            │   └─ avg_cost = total_cost / shares
+            ├─ 实时获取当前价（yfinance）+ 汇率（open.er-api.com）
+            ├─ 计算未实现盈亏：liquidation_value - total_cost
+            └─ 返回每只指数的 PositionSummary + 整体 PortfolioSummary
+```
+
+### 13. MySQL + SQLAlchemy Async ORM
+
+```python
+# database.py — 异步引擎 + 会话管理
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from urllib.parse import quote_plus
+from .config import MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE
+
+def _build_url() -> str:
+    user = quote_plus(MYSQL_USER)       # URL 编码，处理 @ 等特殊字符
+    password = quote_plus(MYSQL_PASSWORD)
+    return f"mysql+aiomysql://{user}:{password}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}?charset=utf8mb4"
+
+engine = create_async_engine(_build_url(), pool_pre_ping=True, pool_size=5, max_overflow=10)
+async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+```
+
+关键注意点：
+- `create_async_engine` 创建异步引擎，`aiomysql` 是纯 Python 的 MySQL 异步驱动
+- `pool_pre_ping=True`：每次从连接池取出连接时先 ping，检测断连自动重连
+- `pool_size=5, max_overflow=10`：常规 5 连接 + 峰值可额外 10 连接
+- `get_session()` 作为 FastAPI `Depends` 使用，请求结束时自动关闭会话
+- `init_db()` 在 `main.py` 的 `lifespan` 启动事件中调用，自动执行 `CREATE TABLE IF NOT EXISTS`
+- ORM 模型定义在 `models.py`：`User`（用户表）和 `Transaction`（交易记录表），通过外键 `user_id` 关联
+
+**条件启动**：MySQL 模块仅在 `MYSQL_HOST` 非空时初始化，未配置时其他功能（指数分析/RAG/新闻）正常运行。
+
+### 14. JWT + bcrypt 认证
+
+```python
+# auth.py — 用户认证工具
+import bcrypt
+from jose import jwt
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+def verify_password(plain: str, hashed: str) -> bool:
+    return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+
+def create_token(user_id: int) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(days=7)
+    return jwt.encode({"sub": str(user_id), "exp": expire}, JWT_SECRET, algorithm="HS256")
+```
+
+技术选型说明：
+- **bcrypt**：当前最安全的密码哈希算法之一，自带盐值、抗彩虹表、计算开销可调。本项目用 bcrypt 原生 API（避免 passlib 与 bcrypt 5.x 的兼容性问题）
+- **JWT (HS256)**：对称签名，服务端用 `JWT_SECRET` 对 `{user_id, expire}` 签名，后续请求只需验签即可知道"是谁在请求"，无需查询 session
+- **`get_current_user()`**：FastAPI `Depends`，从 `Authorization: Bearer <token>` 头解析 JWT → 查数据库 → 返回 User 对象
+- **Token 7 天过期**：平衡安全性与用户体验，过期后需重新登录
+- **`python-dotenv`**：在 `main.py` 启动时加载 `backend/.env`，避免每次手动设置环境变量

@@ -1,6 +1,7 @@
 """数据库引擎与会话管理，使用 SQLAlchemy 2.0 async + aiomysql。"""
 
 from collections.abc import AsyncGenerator
+from urllib.parse import quote_plus
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -10,8 +11,10 @@ from .models import Base
 
 def _build_url() -> str:
     """构建 MySQL 异步连接 URL。"""
+    user = quote_plus(MYSQL_USER)
+    password = quote_plus(MYSQL_PASSWORD)
     return (
-        f"mysql+aiomysql://{MYSQL_USER}:{MYSQL_PASSWORD}"
+        f"mysql+aiomysql://{user}:{password}"
         f"@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}?charset=utf8mb4"
     )
 

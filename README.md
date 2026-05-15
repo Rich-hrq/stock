@@ -94,8 +94,9 @@ stock_website/
 | anthropic | Anthropic API 客户端 |
 | sqlalchemy + aiomysql | MySQL ORM + 异步驱动 |
 | python-jose | JWT Token 签发/验证 |
-| passlib[bcrypt] | 密码加密 |
+| bcrypt | 密码哈希 |
 | httpx | 异步 HTTP 客户端（汇率 API） |
+| python-dotenv | 自动加载 .env 环境变量 |
 
 ## 使用方法
 
@@ -137,12 +138,26 @@ all_proxy=http://127.0.0.1:7897 uvicorn backend.main:app --reload --port 8000
 
 > 或参考下方「服务管理」章节进行启动、停止、重启。
 
-> 若需使用持仓记录功能，需设置 MySQL 环境变量：
+> 若需使用持仓记录功能，需配置 MySQL 连接。支持两种方式：
+> 
+> **方式一：环境变量**
 > ```bash
 > env all_proxy=http://127.0.0.1:7897 \
 >     MYSQL_HOST=your-host MYSQL_USER=your-user MYSQL_PASSWORD=your-pass \
 >     uvicorn backend.main:app --reload --port 8000
 > ```
+> 
+> **方式二：.env 文件**（推荐）
+> 
+> 在 `backend/` 目录下创建 `.env` 文件（已 gitignore）：
+> ```
+> MYSQL_HOST=127.0.0.1
+> MYSQL_USER=stock
+> MYSQL_PASSWORD=your-password
+> MYSQL_DATABASE=stock
+> ```
+> 
+> 启动时 `python-dotenv` 会自动加载 `.env`，无需手动设置环境变量。
 
 ### 6. 访问
 
@@ -164,10 +179,10 @@ all_proxy=http://127.0.0.1:7897 uvicorn backend.main:app --reload --port 8000
 | `ANTHROPIC_AUTH_TOKEN` | 聊天功能必需 | LLM API Key（也支持 `ANTHROPIC_API_KEY`） |
 | `ANTHROPIC_BASE_URL` | 可选 | 自定义 API 端点（如使用 DeepSeek 等兼容服务） |
 | `ANTHROPIC_MODEL` | 可选 | 模型名称，默认 `claude-sonnet-4-6` |
-| `MYSQL_HOST` | 持仓功能必需 | MySQL 远程主机地址 |
+| `MYSQL_HOST` | 持仓功能必需 | MySQL 主机地址，为空时禁用持仓模块 |
 | `MYSQL_PORT` | 可选 | MySQL 端口，默认 3306 |
 | `MYSQL_USER` | 持仓功能必需 | MySQL 用户名 |
-| `MYSQL_PASSWORD` | 持仓功能必需 | MySQL 密码 |
+| `MYSQL_PASSWORD` | 持仓功能必需 | MySQL 密码（含特殊字符时自动 URL 编码） |
 | `MYSQL_DATABASE` | 可选 | 数据库名，默认 `stock` |
 | `JWT_SECRET` | 可选 | JWT 签名密钥，默认 `dev-secret-change-me` |
 

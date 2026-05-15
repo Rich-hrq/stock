@@ -274,3 +274,66 @@ curl -s -X POST http://localhost:8000/api/news/summary \
 1. 将各分组的 series 定义缓存在 `cachedGroups` 对象中，每次切换时从缓存重建完整的可见 series 数组
 2. 切换时始终使用 `chart.setOption(fullOption, true)`（`notMerge=true`），确保旧系列被完全替换
 3. 非 series 部分的配置（grid/xAxis/yAxis/tooltip）缓存在 `cachedBaseOption` 中，通过 `Object.assign({}, cachedBaseOption, { series: visibleSeries })` 拼装完整 option
+
+---
+
+## 持仓记录功能：MySQL 本地配置与测试
+
+**背景**：`563dc52` 提交新增了持仓记录功能（用户注册/登录 + 交易记录 + 持仓盈亏），但未测试，需配置 MySQL 环境变量后才能验证。
+
+### MySQL 用户认证方式确认
+
+**现象**：`mysql -u root` 报 `ERROR 1698 (28000): Access denied for user 'root'@'localhost'`
+
+**原因**：MySQL 默认使用 `auth_socket` 插件认证 root 用户，不验证密码，而是校验操作系统用户身份。只有 OS root 用户才能免密登录 MySQL root。
+
+**解决**：
+```bash
+sudo mysql -u root   # 使用 sudo 以 OS root 身份连接
+```
+或创建专用用户（如 `stock`@`localhost`）用于应用连接。
+
+### 密码含特殊字符导致数据库连接失败
+
+**现象**：注册接口返回 500，服务端报错 `Can't connect to MySQL server on 'stock@127.0.0.1'`
+
+**原因**：MySQL 密码中包含 `@` 字符，在构建 SQLAlchemy 连接 URL 时（`mysql+aiomysql://user:password@host`），密码中的 `@` 被错误解析为 userinfo 与 host 的分隔符，导致主机名变为 `password_suffix@127.0.0.1`。
+
+**解决**：在 `database.py` 的 `_build_url()` 中使用 `urllib.parse.quote_plus` 对用户名和密码进行 URL 编码：
+```python
+from urllib.parse import quote_plus
+user = quote_plus(MYSQL_USER)
+password = quote_plus(MYSQL_PASSWORD)
+```
+
+### passlib 与 bcrypt 5.x 不兼容
+
+**现象**：注册接口返回 500，服务端报错 `ValueError: password cannot be longer than 72 bytes, truncate manually if necessary`
+
+**原因**：`passlib>=1.7.4` 与 `bcrypt>=5.0.0` 不兼容。bcrypt 5.x 的 `hashpw` 函数增加了密码长度上限校验（72 字节），passlib 内部调用时传入的 bytes 对象长度超过限制，触发异常。
+
+**解决**：
+1. 移除 `passlib` 依赖，改用 `bcrypt` 原生 API：
+```python
+import bcrypt
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+def verify_password(plain: str, hashed: str) -> bool:
+    return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+```
+2. `requirements.txt` 中固定 `bcrypt<4.1`（防止未来 5.x 被安装）。
+3. 新增 `python-dotenv>=1.0.0` 依赖，在 `main.py` 顶部调用 `load_dotenv()` 自动加载 `.env`。
+
+### .env 文件不生效
+
+**现象**：在 `backend/.env` 中配置了 MySQL 环境变量，启动后 `MYSQL_HOST` 仍为空，持仓模块不加载。
+
+**原因**：`config.py` 通过 `os.environ.get()` 读取环境变量，但项目未加载 `.env` 文件到进程环境中。
+
+**解决**：在 `main.py` 文件顶部（所有导入之前）添加：
+```python
+from dotenv import load_dotenv
+load_dotenv()
+```
