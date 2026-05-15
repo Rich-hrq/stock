@@ -18,6 +18,11 @@
         const returnStr = stats["区间涨跌幅"] || "0%";
         const isUp = returnStr.startsWith("+");
 
+        const dailyStr = stats["日涨跌"] || "—";
+        const dailyUp = dailyStr.startsWith("+");
+
+        const prevClose = stats["前日收盘"] != null ? stats["前日收盘"] : "—";
+
         container.innerHTML = `
             <div class="stats-grid">
                 <div class="stat-item">
@@ -37,12 +42,20 @@
                     <span class="value">${stats["最低价"] ?? "—"}</span>
                 </div>
                 <div class="stat-item">
-                    <span class="label">区间涨跌幅</span>
+                    <span class="label">区间涨跌 (O→C)</span>
                     <span class="value ${isUp ? "up" : "down"}">${returnStr}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="label">日涨跌 (P→C)</span>
+                    <span class="value ${dailyUp ? "up" : "down"}">${dailyStr}</span>
                 </div>
                 <div class="stat-item">
                     <span class="label">区间振幅</span>
                     <span class="value">${stats["区间振幅"] ?? "—"}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="label">前日收盘</span>
+                    <span class="value">${prevClose}</span>
                 </div>
             </div>
         `;

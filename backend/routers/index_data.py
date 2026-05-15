@@ -38,10 +38,11 @@ async def get_index_analysis(
     if symbol not in US_INDEXES.values():
         raise HTTPException(status_code=400, detail=f"不支持的指数代码: {symbol}。可用: {list(US_INDEXES.values())}")
 
+    from datetime import timedelta
+
     if end_date is None:
         end_date = datetime.today().strftime("%Y-%m-%d")
     if start_date is None:
-        from datetime import timedelta
         start_date = (datetime.today() - timedelta(days=180)).strftime("%Y-%m-%d")
 
     # 获取原始数据
@@ -63,6 +64,16 @@ async def get_index_analysis(
     total_return = (end_price - start_price) / start_price * 100
     amplitude = (max_price - min_price) / start_price * 100
 
+    # 获取前日收盘价，用于计算日涨跌（与 Yahoo Finance 对齐）
+    prev_start_dt = datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=7)
+    df_daily = fetch_index_data(symbol, prev_start_dt.strftime("%Y-%m-%d"), end_date, "1d")
+    prev_close = None
+    prev_close_date = None
+    if len(df_daily) >= 2:
+        prev_close = round(float(df_daily["close"].iloc[-2]), 2)
+        prev_close_date = str(df_daily.index[-2].date())
+    daily_change = (end_price - prev_close) / prev_close * 100 if prev_close else None
+
     stats = {
         "起价": round(start_price, 2),
         "收价": round(end_price, 2),
@@ -72,52 +83,51 @@ async def get_index_analysis(
         "最低日期": str(df["low"].idxmin().date()),
         "区间涨跌幅": f"{total_return:+.2f}%",
         "区间振幅": f"{amplitude:+.2f}%",
+        "前日收盘": prev_close,
+        "日涨跌": f"{daily_change:+.2f}%" if daily_change is not None else None,
         "当前趋势": judge_trend(df, donchian),
     }
 
     # 投资建议
     advice = generate_advice(df, get_index_name(symbol), stats, donchian, atr_series, bollinger)
 
-    # 序列化 DataFrame 为 JSON
-    def df_to_records(df_component) -> list[dict]:
-        """将 DataFrame 或 Series 转为 {date, value} 格式的记录列表。"""
-        frame = df_component if isinstance(df_component, pd.DataFrame) else pd.DataFrame({"value": df_component})
-        frame = frame.copy()
-        frame["date"] = [str(d.date()) if hasattr(d, "date") else str(d) for d in frame.index]
-        return frame.to_dict(orient="records")
+    # 所有 DataFrame/Series 共享同一 index，按位置合并避免日内数据被覆盖
+    def _fmt_date(idx_val) -> str:
+        """将 index 值格式化为日期字符串，日内数据保留时间。"""
+        if hasattr(idx_val, "isoformat"):
+            return idx_val.isoformat()
+        return str(idx_val)
 
-    ohlcv = df_to_records(df[["open", "high", "low", "close", "volume"]])
-    boll_records = df_to_records(bollinger)
-    atr_records = df_to_records(atr_series)
-    dc_records = df_to_records(donchian)
+    ohlcv_records = []
+    for i in range(len(df)):
+        d = _fmt_date(df.index[i])
+        row = df.iloc[i]
+        rec = {
+            "date": d,
+            "open": row["open"],
+            "high": row["high"],
+            "low": row["low"],
+            "close": row["close"],
+            "volume": row["volume"],
+        }
+        # 布林带
+        for col in ["boll_upper", "boll_middle", "boll_lower"]:
+            v = bollinger[col].iloc[i]
+            rec[col] = round(float(v), 2) if pd.notna(v) else None
+        # ATR
+        v = atr_series.iloc[i]
+        rec["atr"] = round(float(v), 2) if pd.notna(v) else None
+        # 唐奇安通道
+        for col in ["dc_high_20", "dc_low_10", "dc_high_55", "dc_low_20"]:
+            v = donchian[col].iloc[i]
+            rec[col] = round(float(v), 2) if pd.notna(v) else None
 
-    # 合并指标到按日期的结构
-    dates_index: dict[str, dict] = {}
-    for r in ohlcv:
-        dates_index[r["date"]] = r
-
-    for r in boll_records:
-        d = r.pop("date")
-        if d in dates_index:
-            dates_index[d].update({k: round(v, 2) if pd.notna(v) else None for k, v in r.items() if k != "value"})
-
-    for r in atr_records:
-        d = r.pop("date")
-        v = r.get("value")
-        if d in dates_index and v is not None and pd.notna(v):
-            dates_index[d]["atr"] = round(v, 2)
-
-    for r in dc_records:
-        d = r.pop("date")
-        if d in dates_index:
-            for k, v in r.items():
-                if k != "value" and pd.notna(v):
-                    dates_index[d][k] = round(v, 2)
+        ohlcv_records.append(rec)
 
     return {
         "symbol": symbol,
         "name": get_index_name(symbol),
-        "data": list(dates_index.values()),
+        "data": ohlcv_records,
         "stats": stats,
         "advice": advice,
         "query": {"start_date": start_date, "end_date": end_date, "interval": interval or "auto"},
