@@ -8,10 +8,18 @@
 
 import pandas as pd
 
-from ..config import BOLLINGER_PERIOD, BOLLINGER_STD, ATR_PERIOD, DONCHIAN_ENTRY, DONCHIAN_STOP
+from ..config import (
+    BOLLINGER_PERIOD,
+    BOLLINGER_STD,
+    ATR_PERIOD,
+    DONCHIAN_ENTRY,
+    DONCHIAN_STOP,
+)
 
 
-def compute_bollinger(df: pd.DataFrame, period: int = BOLLINGER_PERIOD, num_std: float = BOLLINGER_STD) -> pd.DataFrame:
+def compute_bollinger(
+    df: pd.DataFrame, period: int = BOLLINGER_PERIOD, num_std: float = BOLLINGER_STD
+) -> pd.DataFrame:
     """计算布林带。
 
     中轨 = MA(period), 上轨 = 中轨 + num_std * σ, 下轨 = 中轨 - num_std * σ
@@ -22,11 +30,22 @@ def compute_bollinger(df: pd.DataFrame, period: int = BOLLINGER_PERIOD, num_std:
     close = df["close"]
     middle = close.rolling(window=period).mean()
     std = close.rolling(window=period).std()
-    return pd.DataFrame({
-        "boll_upper": middle + num_std * std,
-        "boll_middle": middle,
-        "boll_lower": middle - num_std * std,
-    }, index=df.index)
+    return pd.DataFrame(
+        {
+            "boll_upper": middle + num_std * std,
+            "boll_middle": middle,
+            "boll_lower": middle - num_std * std,
+        },
+        index=df.index,
+    )
+
+
+def compute_ma(df: pd.DataFrame, period: int) -> pd.Series:
+    """计算简单移动平均线 (SMA)。
+
+    MA = close.rolling(period).mean()
+    """
+    return df["close"].rolling(window=period).mean()
 
 
 def compute_atr(df: pd.DataFrame, period: int = ATR_PERIOD) -> pd.Series:
@@ -57,12 +76,15 @@ def compute_donchian(df: pd.DataFrame) -> pd.DataFrame:
     - 系统2（长期）：55日高点入场，20日低点出场
     """
     high, low = df["high"], df["low"]
-    return pd.DataFrame({
-        "dc_high_20": high.rolling(window=DONCHIAN_ENTRY).max(),
-        "dc_low_10": low.rolling(window=10).min(),
-        "dc_high_55": high.rolling(window=DONCHIAN_STOP).max(),
-        "dc_low_20": low.rolling(window=DONCHIAN_ENTRY).min(),
-    }, index=df.index)
+    return pd.DataFrame(
+        {
+            "dc_high_20": high.rolling(window=DONCHIAN_ENTRY).max(),
+            "dc_low_10": low.rolling(window=10).min(),
+            "dc_high_55": high.rolling(window=DONCHIAN_STOP).max(),
+            "dc_low_20": low.rolling(window=DONCHIAN_ENTRY).min(),
+        },
+        index=df.index,
+    )
 
 
 def judge_trend(df: pd.DataFrame, donchian: pd.DataFrame) -> str:
@@ -118,9 +140,15 @@ def generate_advice(
         middle = bb["boll_middle"].iloc[-1]
         lower = bb["boll_lower"].iloc[-1]
         bb_width_pct = (upper - lower) / middle * 100
-        pos_in_band = (latest_close - lower) / (upper - lower) * 100 if upper != lower else 50
-        parts.append(f"\n布林带(20,2)：上轨 {upper:.2f} | 中轨 {middle:.2f} | 下轨 {lower:.2f}")
-        parts.append(f"带宽：{bb_width_pct:.1f}%（带宽越宽波动越大），价格位于带内 {pos_in_band:.0f}% 位置")
+        pos_in_band = (
+            (latest_close - lower) / (upper - lower) * 100 if upper != lower else 50
+        )
+        parts.append(
+            f"\n布林带(20,2)：上轨 {upper:.2f} | 中轨 {middle:.2f} | 下轨 {lower:.2f}"
+        )
+        parts.append(
+            f"带宽：{bb_width_pct:.1f}%（带宽越宽波动越大），价格位于带内 {pos_in_band:.0f}% 位置"
+        )
         if pos_in_band >= 90:
             parts.append("→ 价格接近上轨，短期可能超买")
         elif pos_in_band <= 10:

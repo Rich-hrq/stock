@@ -1,56 +1,246 @@
-/** ECharts 图表渲染：K线图 + 布林带 + 唐奇安通道 + 成交量 */
+/** ECharts 图表渲染：分组切换（走势线 / 均线 / K线+量 / 布林带 / 唐奇安） */
 (function () {
     "use strict";
 
-    let chartInstance = null;
+    var chartInstance = null;
+
+    // 分组状态：price 始终开启不可切换
+    var groupState = {
+        price: true,
+        ma: true,
+        candlestick: false,
+        bollinger: false,
+        donchian: false,
+    };
+
+    // 各组的 series 定义缓存
+    var cachedGroups = {};
+    // 非 series 配置缓存
+    var cachedBaseOption = null;
+
+    // 各 series 的图例颜色映射
+    var legendColors = {
+        "走势线":      { type: "dot",  color: "#e0e6ed" },
+        "MA5":         { type: "dot",  color: "#ffb74d" },
+        "MA10":        { type: "dot",  color: "#ce93d8" },
+        "MA20":        { type: "dot",  color: "#ffd54f" },
+        "K线":         { type: "dot",  color: "#4caf50" },
+        "成交量":       { type: "dot",  color: "#8899aa" },
+        "布林上轨":     { type: "dash", color: "rgba(239,83,80,0.8)" },
+        "布林下轨":     { type: "dash", color: "rgba(76,175,80,0.8)" },
+        "唐奇安上轨(20)": { type: "dot",  color: "rgba(79,195,247,0.6)" },
+        "唐奇安下轨(20)": { type: "dot",  color: "rgba(79,195,247,0.6)" },
+    };
 
     /** 初始化或获取 ECharts 实例 */
     function getChart() {
-        const dom = document.getElementById("mainChart");
+        var dom = document.getElementById("mainChart");
         if (!dom) return null;
         if (chartInstance) {
             chartInstance.resize();
             return chartInstance;
         }
         chartInstance = echarts.init(dom, "dark");
-        window.addEventListener("resize", () => chartInstance?.resize());
+        window.addEventListener("resize", function () { chartInstance && chartInstance.resize(); });
         return chartInstance;
     }
 
+    /** 从缓存中按 groupState 拼装可见 series（去重），并更新内联图例 */
+    function applyVisibility() {
+        if (!chartInstance || !cachedBaseOption) return;
+
+        var seen = {};
+        var visibleSeries = [];
+
+        Object.keys(groupState).forEach(function (g) {
+            if (!groupState[g] || !cachedGroups[g]) return;
+            cachedGroups[g].forEach(function (s) {
+                if (!seen[s.name]) {
+                    seen[s.name] = true;
+                    visibleSeries.push(s);
+                }
+            });
+        });
+
+        var fullOption = Object.assign({}, cachedBaseOption, { series: visibleSeries });
+        chartInstance.setOption(fullOption, true);
+        updateButtons();
+        updateInlineLegend();
+    }
+
+    /** 切换分组显隐 */
+    function toggleGroup(group) {
+        if (group === "price") return;
+        groupState[group] = !groupState[group];
+        applyVisibility();
+    }
+
+    /** 更新按钮 active 样式 */
+    function updateButtons() {
+        var btns = document.querySelectorAll(".toggle-btn");
+        for (var i = 0; i < btns.length; i++) {
+            var btn = btns[i];
+            var g = btn.getAttribute("data-group");
+            if (g === "price") continue;
+            if (groupState[g]) {
+                btn.classList.add("active");
+            } else {
+                btn.classList.remove("active");
+            }
+        }
+    }
+
+    /** 更新内联图例（彩色圆点 + 系列名） */
+    function updateInlineLegend() {
+        var container = document.getElementById("chartLegendInline");
+        if (!container) return;
+
+        var seen = {};
+        var items = [];
+
+        Object.keys(groupState).forEach(function (g) {
+            if (!groupState[g] || !cachedGroups[g]) return;
+            cachedGroups[g].forEach(function (s) {
+                if (seen[s.name]) return;
+                seen[s.name] = true;
+                var cfg = legendColors[s.name];
+                if (!cfg) return;
+                if (cfg.type === "dash") {
+                    items.push('<span class="legend-item"><span class="legend-dash" style="border-color:' + cfg.color + '"></span>' + s.name + '</span>');
+                } else {
+                    items.push('<span class="legend-item"><span class="legend-dot" style="background:' + cfg.color + '"></span>' + s.name + '</span>');
+                }
+            });
+        });
+
+        container.innerHTML = items.join("");
+    }
+
+    /** 绑定按钮点击事件 */
+    function bindToggles() {
+        var container = document.getElementById("chartToggles");
+        if (!container) return;
+        container.addEventListener("click", function (e) {
+            var btn = e.target.closest("button");
+            if (!btn) return;
+            var group = btn.getAttribute("data-group");
+            if (group) toggleGroup(group);
+        });
+    }
+
+    bindToggles();
+
     /** 主渲染函数 */
     function renderChart(data) {
-        const chart = getChart();
+        var chart = getChart();
         if (!chart) return;
 
-        const records = data.data || [];
+        var records = data.data || [];
         if (records.length === 0) {
-            chart.setOption({ title: { text: "暂无数据", left: "center", top: "center" } });
+            cachedGroups = {};
+            cachedBaseOption = null;
+            chart.setOption({
+                title: { text: "暂无数据", left: "center", top: "center", textStyle: { color: "#8899aa" } },
+            }, true);
+            updateInlineLegend();
             return;
         }
 
-        // 格式化日期标签：同日数据只显示时间，多日数据只显示日期
-        const rawDates = records.map((r) => r.date);
-        const sameDay = rawDates.every((d) => d.slice(0, 10) === rawDates[0].slice(0, 10));
-        const dates = rawDates.map((d) => {
+        // ---- 日期格式化 ----
+        var rawDates = records.map(function (r) { return r.date; });
+        var firstDate = rawDates[0].slice(0, 10);
+        var sameDay = rawDates.every(function (d) { return d.slice(0, 10) === firstDate; });
+        var dates = rawDates.map(function (d) {
             if (sameDay) {
-                // 提取 HH:MM，兼容 "2026-05-14T09:30:00" 或 "2026-05-14T09:30:00-04:00"
-                const timeMatch = d.match(/T(\d{2}:\d{2})/);
-                return timeMatch ? timeMatch[1] : d;
+                var m = d.match(/T(\d{2}:\d{2})/);
+                return m ? m[1] : d;
             }
-            return d.slice(0, 10); // YYYY-MM-DD
+            return d.slice(0, 10);
         });
-        const ohlc = records.map((r) => [r.open, r.close, r.low, r.high]);
-        const volumes = records.map((r) => [r.volume || 0, r.close >= r.open ? 1 : -1]);
-        const bbUpper = records.map((r) => r.boll_upper);
-        const bbMiddle = records.map((r) => r.boll_middle);
-        const bbLower = records.map((r) => r.boll_lower);
-        const dcHigh20 = records.map((r) => r.dc_high_20);
-        const dcLow20 = records.map((r) => r.dc_low_20);
 
-        // 判断是否显示成交量（如果全为0则隐藏）
-        const hasVolume = volumes.some((v) => v[0] > 0);
+        // ---- 提取数据列 ----
+        var closeLine = records.map(function (r) { return r.close; });
+        var ohlc = records.map(function (r) { return [r.open, r.close, r.low, r.high]; });
+        var volumes = records.map(function (r) { return [r.volume || 0, r.close >= r.open ? 1 : -1]; });
+        var volData = volumes.map(function (v) { return v[0]; });
+        var bbUpper = records.map(function (r) { return r.boll_upper; });
+        var bbMiddle = records.map(function (r) { return r.boll_middle; });
+        var bbLower = records.map(function (r) { return r.boll_lower; });
+        var dcHigh20 = records.map(function (r) { return r.dc_high_20; });
+        var dcLow20 = records.map(function (r) { return r.dc_low_20; });
+        var ma5 = records.map(function (r) { return r.ma5; });
+        var ma10 = records.map(function (r) { return r.ma10; });
 
-        const option = {
+        var hasVolume = volumes.some(function (v) { return v[0] > 0; });
+
+        // ---- 共享系列：MA20 / 布林中轨（同一条线，两组共用） ----
+        var ma20Series = {
+            name: "MA20", type: "line", data: bbMiddle,
+            lineStyle: { color: "#ffd54f", width: 1.5 }, symbol: "none",
+            xAxisIndex: 0, yAxisIndex: 0,
+        };
+
+        // ---- 构建各分组的 series 定义 ----
+        cachedGroups.price = [
+            {
+                name: "走势线", type: "line", data: closeLine,
+                lineStyle: { color: "#e0e6ed", width: 1.5 }, symbol: "none",
+                xAxisIndex: 0, yAxisIndex: 0,
+            },
+        ];
+
+        cachedGroups.ma = [
+            { name: "MA5", type: "line", data: ma5, lineStyle: { color: "#ffb74d", width: 1.5 }, symbol: "none", xAxisIndex: 0, yAxisIndex: 0 },
+            { name: "MA10", type: "line", data: ma10, lineStyle: { color: "#ce93d8", width: 1.5 }, symbol: "none", xAxisIndex: 0, yAxisIndex: 0 },
+            ma20Series,
+        ];
+
+        cachedGroups.candlestick = [
+            {
+                name: "K线", type: "candlestick", data: ohlc,
+                itemStyle: { color: "#4caf50", color0: "#ef5350", borderColor: "#4caf50", borderColor0: "#ef5350" },
+                xAxisIndex: 0, yAxisIndex: 0,
+            },
+        ];
+        if (hasVolume) {
+            cachedGroups.candlestick.push({
+                name: "成交量", type: "bar", data: volData,
+                itemStyle: {
+                    color: function (params) {
+                        return volumes[params.dataIndex][1] > 0 ? "#4caf50" : "#ef5350";
+                    },
+                },
+                xAxisIndex: 1, yAxisIndex: 1,
+            });
+        }
+
+        cachedGroups.bollinger = [
+            ma20Series,  // 布林中轨 = MA20，即使均线组关闭也会显示
+            {
+                name: "布林上轨", type: "line", data: bbUpper,
+                lineStyle: { color: "rgba(239,83,80,0.6)", width: 1, type: "dashed" }, symbol: "none",
+                xAxisIndex: 0, yAxisIndex: 0,
+            },
+            {
+                name: "布林下轨", type: "line", data: bbLower,
+                lineStyle: { color: "rgba(76,175,80,0.6)", width: 1, type: "dashed" }, symbol: "none",
+                areaStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: "rgba(79,195,247,0.05)" },
+                        { offset: 1, color: "rgba(79,195,247,0.02)" },
+                    ]),
+                },
+                xAxisIndex: 0, yAxisIndex: 0,
+            },
+        ];
+
+        cachedGroups.donchian = [
+            { name: "唐奇安上轨(20)", type: "line", data: dcHigh20, lineStyle: { color: "rgba(79,195,247,0.5)", width: 1 }, symbol: "none", xAxisIndex: 0, yAxisIndex: 0 },
+            { name: "唐奇安下轨(20)", type: "line", data: dcLow20, lineStyle: { color: "rgba(79,195,247,0.5)", width: 1 }, symbol: "none", xAxisIndex: 0, yAxisIndex: 0 },
+        ];
+
+        // ---- 缓存基础配置 ----
+        cachedBaseOption = {
             backgroundColor: "#0f1923",
             animation: true,
             tooltip: {
@@ -61,24 +251,21 @@
                 textStyle: { color: "#e0e6ed", fontSize: 12 },
                 formatter: function (params) {
                     if (!params || params.length === 0) return "";
-                    const d = params[0].axisValue;
-                    let html = `<strong>${d}</strong><br/>`;
-                    // 找 OHLC
-                    const ohlcItem = params.find((p) => p.seriesName === "K线");
-                    if (ohlcItem) {
-                        const vals = ohlcItem.data;
-                        html += `开: ${vals[1]}<br/>收: ${vals[2]}<br/>低: ${vals[3]}<br/>高: ${vals[4]}<br/>`;
-                    }
-                    const bbU = params.find((p) => p.seriesName === "布林上轨");
-                    const bbM = params.find((p) => p.seriesName === "布林中轨");
-                    const bbL = params.find((p) => p.seriesName === "布林下轨");
-                    if (bbU && bbU.data != null) html += `布林上轨: ${bbU.data}<br/>`;
-                    if (bbM && bbM.data != null) html += `布林中轨: ${bbM.data}<br/>`;
-                    if (bbL && bbL.data != null) html += `布林下轨: ${bbL.data}<br/>`;
-                    const dcH = params.find((p) => p.seriesName === "唐奇安上轨(20)");
-                    const dcL = params.find((p) => p.seriesName === "唐奇安下轨(20)");
-                    if (dcH && dcH.data != null) html += `唐奇安上轨: ${dcH.data}<br/>`;
-                    if (dcL && dcL.data != null) html += `唐奇安下轨: ${dcL.data}<br/>`;
+                    var d = params[0].axisValue;
+                    var html = "<strong>" + d + "</strong><br/>";
+                    params.forEach(function (p) {
+                        var name = p.seriesName;
+                        if (name === "K线") {
+                            var vals = p.data;
+                            html += "开:" + vals[1] + " 收:" + vals[2] + " 低:" + vals[3] + " 高:" + vals[4] + "<br/>";
+                        } else if (name === "走势线") {
+                            html += "收盘:" + p.data + "<br/>";
+                        } else if (name === "成交量") {
+                            // 不显示在 tooltip
+                        } else {
+                            html += name + ":" + p.data + "<br/>";
+                        }
+                    });
                     return html;
                 },
             },
@@ -100,95 +287,12 @@
                     { type: "value", gridIndex: 1, splitLine: { show: false }, axisLabel: { show: false } },
                 ]
                 : [{ type: "value", scale: true, splitLine: { lineStyle: { color: "#1a2736" } }, axisLabel: { color: "#8899aa" } }],
-            series: [
-                // 布林带（先绘制，在 K 线下方）
-                {
-                    name: "布林上轨",
-                    type: "line",
-                    data: bbUpper,
-                    lineStyle: { color: "rgba(239,83,80,0.4)", width: 1, type: "dashed" },
-                    symbol: "none",
-                    xAxisIndex: 0,
-                    yAxisIndex: 0,
-                },
-                {
-                    name: "布林中轨",
-                    type: "line",
-                    data: bbMiddle,
-                    lineStyle: { color: "rgba(255,183,77,0.5)", width: 1 },
-                    symbol: "none",
-                    xAxisIndex: 0,
-                    yAxisIndex: 0,
-                },
-                {
-                    name: "布林下轨",
-                    type: "line",
-                    data: bbLower,
-                    lineStyle: { color: "rgba(76,175,80,0.4)", width: 1, type: "dashed" },
-                    symbol: "none",
-                    areaStyle: {
-                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                            { offset: 0, color: "rgba(79,195,247,0.05)" },
-                            { offset: 1, color: "rgba(79,195,247,0.02)" },
-                        ]),
-                    },
-                    xAxisIndex: 0,
-                    yAxisIndex: 0,
-                },
-                // 唐奇安通道
-                {
-                    name: "唐奇安上轨(20)",
-                    type: "line",
-                    data: dcHigh20,
-                    lineStyle: { color: "rgba(79,195,247,0.35)", width: 1 },
-                    symbol: "none",
-                    xAxisIndex: 0,
-                    yAxisIndex: 0,
-                },
-                {
-                    name: "唐奇安下轨(20)",
-                    type: "line",
-                    data: dcLow20,
-                    lineStyle: { color: "rgba(79,195,247,0.35)", width: 1 },
-                    symbol: "none",
-                    xAxisIndex: 0,
-                    yAxisIndex: 0,
-                },
-                // K 线
-                {
-                    name: "K线",
-                    type: "candlestick",
-                    data: ohlc,
-                    itemStyle: {
-                        color: "#4caf50",
-                        color0: "#ef5350",
-                        borderColor: "#4caf50",
-                        borderColor0: "#ef5350",
-                    },
-                    xAxisIndex: 0,
-                    yAxisIndex: 0,
-                },
-            ],
         };
 
-        // 如果有成交量数据，添加到 series
-        if (hasVolume) {
-            option.series.push({
-                name: "成交量",
-                type: "bar",
-                data: volumes.map((v) => v[0]),
-                xAxisIndex: 1,
-                yAxisIndex: 1,
-                itemStyle: {
-                    color: function (params) {
-                        return volumes[params.dataIndex][1] > 0 ? "#4caf50" : "#ef5350";
-                    },
-                },
-            });
-        }
-
-        chart.setOption(option, true);
+        // ---- 首次渲染 ----
+        applyVisibility();
     }
 
     window.renderChart = renderChart;
+    window.toggleGroup = toggleGroup;
 })();

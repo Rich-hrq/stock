@@ -1,4 +1,4 @@
-"""美股指数数据 API 路由，提供指数列表和综合技术分析数据。"""
+"""美股指数数据 API 路由，提供指数列表和综合技术分析数据（含均线/布林带/唐奇安通道/ATR）。"""
 
 from datetime import datetime
 
@@ -10,6 +10,7 @@ from ..services.market_data import fetch_index_data, list_indexes, get_index_nam
 from ..services.indicators import (
     compute_bollinger,
     compute_atr,
+    compute_ma,
     compute_donchian,
     generate_advice,
     judge_trend,
@@ -54,6 +55,8 @@ async def get_index_analysis(
     bollinger = compute_bollinger(df)
     atr_series = compute_atr(df)
     donchian = compute_donchian(df)
+    ma5 = compute_ma(df, 5)
+    ma10 = compute_ma(df, 10)
 
     # 统计指标
     # 使用 OHLC 完整四价：开盘为起点，最高/最低反映真实日内极值
@@ -120,6 +123,10 @@ async def get_index_analysis(
         # 唐奇安通道
         for col in ["dc_high_20", "dc_low_10", "dc_high_55", "dc_low_20"]:
             v = donchian[col].iloc[i]
+            rec[col] = round(float(v), 2) if pd.notna(v) else None
+        # 均线
+        for col, series in [("ma5", ma5), ("ma10", ma10)]:
+            v = series.iloc[i]
             rec[col] = round(float(v), 2) if pd.notna(v) else None
 
         ohlcv_records.append(rec)
