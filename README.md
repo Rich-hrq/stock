@@ -7,7 +7,7 @@
 - 自动生成趋势跟踪投资建议
 - 基于原书 PDF 的 RAG 智能问答（LangGraph v3：智能评估 + 选择性扩展 + 多查询融合检索）
 - Polymarket 预测市场浏览（独立页面，按事件分组翻页，关键词/活跃日期高亮，概率条可视化）
-- The Guardian 新闻资讯（独立页面，爬取最新报道，按分类标签展示，支持原文链接跳转）
+- The Guardian 新闻资讯（独立页面，爬取最新报道，按分类标签展示，支持原文链接跳转，AI 自动生成当日新闻摘要）
 - Guardian 反向代理（通过后端代理访问新闻原文，\<base\> 标签注入 + 域名白名单防滥用）
 
 ## 目录结构
@@ -48,6 +48,7 @@ stock_website/
 │   │   ├── indicators.py     # 布林带、ATR、唐奇安通道、趋势判断、投资建议
 │   │   ├── polymarket.py     # Polymarket API 数据获取与过滤
 │   │   ├── guardian_news.py  # The Guardian 新闻爬取（BeautifulSoup）
+│   │   ├── news_summary.py   # AI 新闻摘要（基于新闻标题调用 LLM 生成当日总结）
 │   │   ├── proxy.py           # Guardian 反向代理（base 标签注入 + 白名单）
 │   │   ├── rag.py            # RAG v1（retrieve → generate）
 │   │   ├── rag_v2.py         # RAG v2（rewrite → judge → 条件路由）
@@ -201,6 +202,7 @@ lsof -ti:8000 | xargs kill 2>/dev/null; sleep 1
 | POST | `/api/chat` | RAG 对话（body: `{message, history?}`） |
 | POST | `/api/predict` | Polymarket 预测数据（body: `{keywords, limit?, threshold?}`） |
 | POST | `/api/guardian_news` | The Guardian 新闻爬取（无需参数） |
+| POST | `/api/news/summary` | AI 新闻摘要（body: `{headlines: [{title, link}, ...]}`） |
 | GET | `/api/proxy?url=...` | Guardian 反向代理（仅限 www.theguardian.com） |
 | GET | `/api/health` | 健康检查 |
 
@@ -213,6 +215,7 @@ lsof -ti:8000 | xargs kill 2>/dev/null; sleep 1
     │                      │                    │
     │                      ├──→ /api/predict ──→ Polymarket API
     │                      ├──→ /api/guardian_news ──→ The Guardian
+    │                      ├──→ /api/news/summary ──→ news_summary.py ──→ LLM（生成当日摘要）
     │                      ├──→ /api/proxy ──→ Guardian 反向代理
     │                      │
     └──← 前端静态文件（HTML/CSS/JS）              ├─ v1: retrieve → generate

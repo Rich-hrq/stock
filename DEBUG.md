@@ -232,6 +232,26 @@ min_price   = df["low"].min()         # 最低价 = 真实日内最低
 
 ---
 
+## AI 新闻摘要返回空字符串
+
+**现象**：网页端「AI 今日摘要」区域显示空白，API `/api/news/summary` 返回 `{"summary":""}`
+
+**原因**：服务器使用系统 Python（`/opt/homebrew/Cellar/python@3.12/...`）启动，而非 `.stock` 虚拟环境。系统 Python 环境中 `langchain_anthropic` 的版本或依赖与虚拟环境不同，导致 LLM 响应处理异常，`generate_summary()` 返回空字符串。
+
+**解决**：始终使用 `.stock` 虚拟环境的 Python 启动服务器：
+```bash
+/Users/hrq/Coding/stock/.stock/bin/python -m uvicorn backend.main:app --reload --port 8000
+```
+
+**验证**：启动后测试摘要接口：
+```bash
+curl -s -X POST http://localhost:8000/api/news/summary \
+  -H "Content-Type: application/json" \
+  -d '{"headlines": [{"title": "test", "link": "https://www.theguardian.com/world/2026/may/14/test"}]}'
+```
+
+---
+
 ## 前端静态文件被浏览器缓存，修改后页面无变化
 
 **现象**：修改 JS/CSS 文件后刷新页面，功能无变化。

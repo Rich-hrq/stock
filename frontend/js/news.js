@@ -7,6 +7,8 @@
     const newsArea = document.getElementById("newsArea");
     const newsMeta = document.getElementById("newsMeta");
     const newsList = document.getElementById("newsList");
+    const aiSummary = document.getElementById("aiSummary");
+    const aiSummaryBody = document.getElementById("aiSummaryBody");
 
     let isFetching = false;
 
@@ -47,6 +49,7 @@
                 emptyState.style.display = "none";
                 newsArea.style.display = "block";
                 renderNews(items);
+                fetchAISummary(items);
             }
         } catch (e) {
             emptyState.innerHTML = escapeHtml("获取失败: " + e.message);
@@ -94,6 +97,46 @@
         }
 
         newsList.innerHTML = html;
+    }
+
+    // ---- AI 摘要 ----
+    async function fetchAISummary(items) {
+        const card = document.getElementById("aiSummary");
+        const body = document.getElementById("aiSummaryBody");
+
+        if (!card || !body) {
+            console.warn("AI摘要: DOM元素未找到 — aiSummary=" + !!card + " aiSummaryBody=" + !!body + "（可能是浏览器缓存了旧HTML，请 Cmd+Shift+R 强制刷新）");
+            return;
+        }
+
+        card.style.display = "block";
+        body.innerHTML = '<span class="loading-spinner"></span> 正在生成摘要...';
+
+        try {
+            const res = await fetch("/api/news/summary", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ headlines: items }),
+            });
+
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.detail || "摘要生成失败");
+            }
+
+            const data = await res.json();
+            body.innerHTML = formatSummary(data.summary);
+        } catch (e) {
+            body.innerHTML = `<span style="color:var(--text-dim);">摘要生成失败：${escapeHtml(e.message)}</span>`;
+        }
+    }
+
+    function formatSummary(text) {
+        // 先转义，再处理换行和标题加粗
+        return escapeHtml(text)
+            .replace(/\n\n/g, "<br><br>")
+            .replace(/\n/g, "<br>")
+            .replace(/【(.+?)】/g, "<strong>【$1】</strong>");
     }
 
     // ---- 工具函数 ----

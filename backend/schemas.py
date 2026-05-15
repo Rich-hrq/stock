@@ -28,3 +28,16 @@ class PredictRequest(BaseModel):
     keywords: list[str] = ["nasdaq", "^ndx", "s&p500", "dow jones"]
     limit: int = 500
     threshold: int = 100000
+
+
+# ---- 新闻摘要 (guardian.py) ----
+
+class NewsSummaryRequest(BaseModel):
+    """AI 新闻摘要请求"""
+    headlines: list[dict]  # [{title, link}, ...]
+
+
+class NewsSummaryResponse(BaseModel):
+    """AI 新闻摘要响应"""
+    summary: str
+    generated_at: str

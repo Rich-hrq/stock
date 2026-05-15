@@ -35,9 +35,16 @@
     <!-- 新闻列表 -->
     <main class="news-area" id="newsArea" style="display:none;">
         <div class="news-meta" id="newsMeta"></div>
+        <div class="ai-summary" id="aiSummary" style="display:none;">
+            <div class="ai-summary-header">
+                <h3>AI 今日摘要</h3>
+                <span class="ai-summary-hint">基于所有新闻标题自动生成</span>
+            </div>
+            <div class="ai-summary-body" id="aiSummaryBody"></div>
+        </div>
         <div class="news-list" id="newsList"></div>
     </main>
 
-    <script src="/js/news.js"></script>
+    <script src="/js/news.js?v=2"></script>
 </body>
 </html>

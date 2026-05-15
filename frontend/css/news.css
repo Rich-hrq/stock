@@ -203,6 +203,43 @@ body {
     flex-shrink: 0;
 }
 
+/* ===== AI 摘要卡片 ===== */
+.ai-summary {
+    max-width: 800px;
+    margin: 0 auto 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    animation: fadeIn 0.3s ease;
+    border-left: 4px solid var(--accent);
+}
+
+.ai-summary-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.ai-summary-header h3 {
+    font-size: 14px;
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.ai-summary-hint {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-left: auto;
+}
+
+.ai-summary-body {
+    font-size: 14px;
+    line-height: 1.9;
+    color: var(--text);
+}
+
 /* ===== 加载指示器 ===== */
 .loading-spinner {
     display: inline-block;
