@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>持仓记录</title>
+    <link rel="stylesheet" href="/css/portfolio.css">
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <header class="topbar">
+        <a href="/" class="back-link">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            返回主页
+        </a>
+        <h1 class="topbar-title">持仓记录</h1>
+        <div class="topbar-right" id="topbarRight">
+            <!-- JS 动态填充：登录状态 -->
+        </div>
+    </header>
+
+    <!-- 未登录：登录/注册表单 -->
+    <div id="authView" class="auth-view">
+        <div class="auth-card">
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-tab="login">登录</button>
+                <button class="auth-tab" data-tab="register">注册</button>
+            </div>
+            <form id="authForm" class="auth-form">
+                <div class="form-group">
+                    <label for="authUsername">用户名</label>
+                    <input type="text" id="authUsername" placeholder="3-20个字符" autocomplete="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="authPassword">密码</label>
+                    <input type="password" id="authPassword" placeholder="至少6位" autocomplete="current-password" required>
+                </div>
+                <div class="auth-error" id="authError"></div>
+                <button type="submit" class="btn-primary" id="authSubmit">登录</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 已登录：主功能区 -->
+    <div id="mainView" class="main-view" style="display:none;">
+
+        <!-- 新增交易表单 -->
+        <section class="trade-section">
+            <h2 class="section-title">新增交易</h2>
+            <form id="tradeForm" class="trade-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="txSymbol">指数</label>
+                        <select id="txSymbol" required>
+                            <option value="^GSPC">标普500</option>
+                            <option value="^NDX">纳斯达克100</option>
+                            <option value="^IXIC">纳斯达克综合</option>
+                            <option value="^DJI">道琼斯工业</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="txDirection">方向</label>
+                        <select id="txDirection" required>
+                            <option value="buy">买入</option>
+                            <option value="sell">卖出</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="txDate">交易日期</label>
+                        <input type="date" id="txDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="txAmount">人民币金额 (¥)</label>
+                        <input type="number" id="txAmount" placeholder="如 10000" min="0.01" step="0.01" required>
+                    </div>
+                </div>
+                <div class="form-hint">
+                    提交后系统将自动查询当日收盘价和汇率，计算持有份额。
+                </div>
+                <div class="trade-error" id="tradeError"></div>
+                <button type="submit" class="btn-primary">提交交易</button>
+            </form>
+        </section>
+
+        <!-- 持仓汇总 -->
+        <section class="summary-section">
+            <h2 class="section-title">持仓汇总</h2>
+            <div id="summaryCards" class="summary-cards">
+                <!-- JS 动态填充 -->
+            </div>
+            <div id="summaryEmpty" class="empty-hint" style="display:none;">暂无持仓记录</div>
+        </section>
+
+        <!-- 交易历史 -->
+        <section class="history-section">
+            <h2 class="section-title">交易历史</h2>
+            <div id="historyTable" class="history-table-wrap">
+                <!-- JS 动态填充 -->
+            </div>
+            <div id="historyEmpty" class="empty-hint" style="display:none;">暂无交易记录</div>
+        </section>
+    </div>
+
+    <script src="/js/portfolio.js"></script>
+</body>
+</html>

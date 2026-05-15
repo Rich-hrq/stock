@@ -10,6 +10,7 @@
 - Polymarket 预测市场浏览（独立页面，按事件分组翻页，关键词/活跃日期高亮，概率条可视化）
 - The Guardian 新闻资讯（独立页面，爬取最新报道，按分类标签展示，支持原文链接跳转，AI 自动生成当日新闻摘要）
 - Guardian 反向代理（通过后端代理访问新闻原文，\<base\> 标签注入 + 域名白名单防滥用）
+- 持仓记录（登录后可记录美股指数买卖操作，自动查询收盘价和汇率，计算持仓盈亏）
 
 ## 目录结构
 
@@ -19,30 +20,38 @@ stock_website/
 │   ├── index.html            # 主页（指数分析）
 │   ├── prediction.html       # 预测市场页
 │   ├── news.html             # 新闻资讯页
+│   ├── portfolio.html        # 持仓记录页（需登录）
 │   ├── css/
 │   │   ├── styles.css        # 主页样式
 │   │   ├── prediction.css    # 预测市场页样式
-│   │   └── news.css          # 新闻资讯页样式
+│   │   ├── news.css          # 新闻资讯页样式
+│   │   └── portfolio.css     # 持仓记录页样式
 │   └── js/
 │       ├── app.js            # 应用入口，状态管理
 │       ├── charts.js         # ECharts 图表（分组切换：走势线/均线/K线+量/布林带/唐奇安）
 │       ├── indicators.js     # 侧边面板：统计、指标、建议
 │       ├── chat.js           # RAG 聊天对话框
 │       ├── prediction.js     # 预测市场查询与渲染
-│       └── news.js           # 新闻抓取与渲染
+│       ├── news.js           # 新闻抓取与渲染
+│       └── portfolio.js      # 持仓记录页面逻辑
 ├── backend/                   # 后端项目（FastAPI）
 │   ├── __init__.py           # Python 包标识
 │   ├── main.py               # FastAPI 应用入口
 │   ├── config.py             # 全局配置（API密钥、指标参数、路径等）
 │   ├── schemas.py            # Pydantic 请求/响应模型（接口格式定义）
 │   ├── requirements.txt      # Python 依赖
+│   ├── database.py           # 数据库引擎与会话管理（SQLAlchemy async + aiomysql）
+│   ├── models.py             # SQLAlchemy ORM 模型（User, Transaction）
+│   ├── auth.py               # 用户认证工具（JWT + bcrypt）
 │   ├── routers/
 │   │   ├── __init__.py
 │   │   ├── index_data.py     # 指数数据 API（/api/indices/*）
 │   │   ├── chat.py           # RAG 对话 API（/api/chat）
 │   │   ├── prediction.py     # 预测市场 API（/api/predict）
 │   │   ├── guardian.py       # 新闻爬取 API（/api/guardian_news）
-│   │   └── proxy.py           # 反向代理 API（/api/proxy）
+│   │   ├── proxy.py          # 反向代理 API（/api/proxy）
+│   │   ├── auth.py           # 用户认证 API（/api/auth/*）
+│   │   └── portfolio.py      # 持仓交易 API（/api/portfolio/*）
 │   ├── services/
 │   │   ├── __init__.py
 │   │   ├── market_data.py    # yfinance 数据获取 + 缓存 + 代理
@@ -50,7 +59,8 @@ stock_website/
 │   │   ├── polymarket.py     # Polymarket API 数据获取与过滤
 │   │   ├── guardian_news.py  # The Guardian 新闻爬取（BeautifulSoup）
 │   │   ├── news_summary.py   # AI 新闻摘要（基于新闻标题调用 LLM 生成当日总结）
-│   │   ├── proxy.py           # Guardian 反向代理（base 标签注入 + 白名单）
+│   │   ├── proxy.py          # Guardian 反向代理（base 标签注入 + 白名单）
+│   │   ├── exchange_rate.py  # USD/CNY 汇率查询（open.er-api.com）
 │   │   ├── rag.py            # RAG v1（retrieve → generate）
 │   │   ├── rag_v2.py         # RAG v2（rewrite → judge → 条件路由）
 │   │   └── rag_v3.py         # RAG v3（evaluate → 选择性扩展 → 多查询融合）
@@ -82,6 +92,10 @@ stock_website/
 | sentence-transformers | 本地文本嵌入模型 |
 | PyMuPDF | PDF 文本提取 |
 | anthropic | Anthropic API 客户端 |
+| sqlalchemy + aiomysql | MySQL ORM + 异步驱动 |
+| python-jose | JWT Token 签发/验证 |
+| passlib[bcrypt] | 密码加密 |
+| httpx | 异步 HTTP 客户端（汇率 API） |
 
 ## 使用方法
 
@@ -123,11 +137,19 @@ all_proxy=http://127.0.0.1:7897 uvicorn backend.main:app --reload --port 8000
 
 > 或参考下方「服务管理」章节进行启动、停止、重启。
 
+> 若需使用持仓记录功能，需设置 MySQL 环境变量：
+> ```bash
+> env all_proxy=http://127.0.0.1:7897 \
+>     MYSQL_HOST=your-host MYSQL_USER=your-user MYSQL_PASSWORD=your-pass \
+>     uvicorn backend.main:app --reload --port 8000
+> ```
+
 ### 6. 访问
 
 - 主页（指数分析）：http://localhost:8000
 - 预测市场页：http://localhost:8000/prediction.html
 - 新闻资讯页：http://localhost:8000/news.html
+- 持仓记录页：http://localhost:8000/portfolio.html
 - API 文档（Swagger）：http://localhost:8000/docs
 
 ---
@@ -142,6 +164,12 @@ all_proxy=http://127.0.0.1:7897 uvicorn backend.main:app --reload --port 8000
 | `ANTHROPIC_AUTH_TOKEN` | 聊天功能必需 | LLM API Key（也支持 `ANTHROPIC_API_KEY`） |
 | `ANTHROPIC_BASE_URL` | 可选 | 自定义 API 端点（如使用 DeepSeek 等兼容服务） |
 | `ANTHROPIC_MODEL` | 可选 | 模型名称，默认 `claude-sonnet-4-6` |
+| `MYSQL_HOST` | 持仓功能必需 | MySQL 远程主机地址 |
+| `MYSQL_PORT` | 可选 | MySQL 端口，默认 3306 |
+| `MYSQL_USER` | 持仓功能必需 | MySQL 用户名 |
+| `MYSQL_PASSWORD` | 持仓功能必需 | MySQL 密码 |
+| `MYSQL_DATABASE` | 可选 | 数据库名，默认 `stock` |
+| `JWT_SECRET` | 可选 | JWT 签名密钥，默认 `dev-secret-change-me` |
 
 ### 启动服务
 
@@ -205,6 +233,13 @@ lsof -ti:8000 | xargs kill 2>/dev/null; sleep 1
 | POST | `/api/guardian_news` | The Guardian 新闻爬取（无需参数） |
 | POST | `/api/news/summary` | AI 新闻摘要（body: `{headlines: [{title, link}, ...]}`） |
 | GET | `/api/proxy?url=...` | Guardian 反向代理（仅限 www.theguardian.com） |
+| POST | `/api/auth/register` | 用户注册（body: `{username, password}`） |
+| POST | `/api/auth/login` | 用户登录（body: `{username, password}`） |
+| GET | `/api/auth/me` | 获取当前用户信息（需 Bearer Token） |
+| POST | `/api/portfolio/transactions` | 新增交易记录（需登录） |
+| GET | `/api/portfolio/transactions` | 获取所有交易记录（需登录） |
+| DELETE | `/api/portfolio/transactions/{id}` | 删除交易记录（需登录） |
+| GET | `/api/portfolio/summary` | 持仓汇总（需登录） |
 | GET | `/api/health` | 健康检查 |
 
 ## 技术架构
@@ -222,8 +257,10 @@ lsof -ti:8000 | xargs kill 2>/dev/null; sleep 1
     │                      ├──→ /api/guardian_news ──→ The Guardian
     │                      ├──→ /api/news/summary ──→ news_summary.py ──→ LLM（生成当日摘要）
     │                      ├──→ /api/proxy ──→ Guardian 反向代理
-    │                      
-    └──← 前端静态文件（HTML/CSS/JS）              
+    │                      ├──→ /api/auth/* ──→ MySQL（用户注册/登录 + JWT）
+    │                      ├──→ /api/portfolio/* ──→ MySQL + yfinance + 汇率API
+    │
+    └──← 前端静态文件（HTML/CSS/JS）
 ```
 
 ## 海龟交易法则指标说明
