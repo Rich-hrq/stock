@@ -259,3 +259,18 @@ curl -s -X POST http://localhost:8000/api/news/summary \
 **原因**：浏览器缓存了旧版本的静态资源。
 
 **解决**：强制刷新（`Cmd+Shift+R`），或打开 DevTools → Network → Disable cache。
+
+---
+
+## ECharts 分组切换：`series.show` 与 `setOption` 合并行为导致切换失效
+
+**现象**：图表分组切换按钮点击后，线条不隐藏/不显示；或默认应隐藏的 K 线+量/布林带/唐奇安全部同时显示。
+
+**原因**：
+1. `series.show: false` 在某些 ECharts 版本中不可靠，无法保证系列被隐藏
+2. 使用 `chart.setOption({ series: [...] }, false)`（默认合并模式）更新部分系列时，ECharts 按 `name`/`id` 匹配系列进行合并，但不会移除旧 option 中存在而新 option 中不存在的系列——导致隐藏的系列无法被移除
+
+**解决**：
+1. 将各分组的 series 定义缓存在 `cachedGroups` 对象中，每次切换时从缓存重建完整的可见 series 数组
+2. 切换时始终使用 `chart.setOption(fullOption, true)`（`notMerge=true`），确保旧系列被完全替换
+3. 非 series 部分的配置（grid/xAxis/yAxis/tooltip）缓存在 `cachedBaseOption` 中，通过 `Object.assign({}, cachedBaseOption, { series: visibleSeries })` 拼装完整 option

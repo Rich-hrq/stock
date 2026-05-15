@@ -3,6 +3,7 @@
 基于《海龟交易法则》的美股指数技术分析网站，支持：
 
 - 四大美股指数（标普500、纳斯达克100、纳斯达克综合、道琼斯）的多时间级别走势图
+- 图表分组切换：走势线 / 均线(MA5/MA10/MA20) / K线+量 / 布林带 / 唐奇安通道，点击按钮即时显隐
 - 海龟交易法则技术指标：布林带、ATR/N值、唐奇安通道、趋势判断
 - 自动生成趋势跟踪投资建议
 - 基于原书 PDF 的 RAG 智能问答（LangGraph v3：智能评估 + 选择性扩展 + 多查询融合检索）
@@ -24,7 +25,7 @@ stock_website/
 │   │   └── news.css          # 新闻资讯页样式
 │   └── js/
 │       ├── app.js            # 应用入口，状态管理
-│       ├── charts.js         # ECharts K线图 + 布林带 + 唐奇安
+│       ├── charts.js         # ECharts 图表（分组切换：走势线/均线/K线+量/布林带/唐奇安）
 │       ├── indicators.js     # 侧边面板：统计、指标、建议
 │       ├── chat.js           # RAG 聊天对话框
 │       ├── prediction.js     # 预测市场查询与渲染
@@ -40,12 +41,12 @@ stock_website/
 │   │   ├── index_data.py     # 指数数据 API（/api/indices/*）
 │   │   ├── chat.py           # RAG 对话 API（/api/chat）
 │   │   ├── prediction.py     # 预测市场 API（/api/predict）
-│   │   └── guardian.py       # 新闻爬取 API（/api/guardian_news）
+│   │   ├── guardian.py       # 新闻爬取 API（/api/guardian_news）
 │   │   └── proxy.py           # 反向代理 API（/api/proxy）
 │   ├── services/
 │   │   ├── __init__.py
 │   │   ├── market_data.py    # yfinance 数据获取 + 缓存 + 代理
-│   │   ├── indicators.py     # 布林带、ATR、唐奇安通道、趋势判断、投资建议
+│   │   ├── indicators.py     # 布林带、ATR、唐奇安通道、均线、趋势判断、投资建议
 │   │   ├── polymarket.py     # Polymarket API 数据获取与过滤
 │   │   ├── guardian_news.py  # The Guardian 新闻爬取（BeautifulSoup）
 │   │   ├── news_summary.py   # AI 新闻摘要（基于新闻标题调用 LLM 生成当日总结）
@@ -213,14 +214,16 @@ lsof -ti:8000 | xargs kill 2>/dev/null; sleep 1
     │                      │                    │
     │                      ├──→ /api/chat ──→ LangGraph ──→ ChromaDB ──→ LLM
     │                      │                    │
+    │                      │                    ├─ v1: retrieve → generate
+    │                      │                    ├─ v2: rewrite → retrieve → judge → 条件路由
+    │                      │                    └─ v3: evaluate → 选择性扩展 → 多查询融合 → generate
+    │                      │
     │                      ├──→ /api/predict ──→ Polymarket API
     │                      ├──→ /api/guardian_news ──→ The Guardian
     │                      ├──→ /api/news/summary ──→ news_summary.py ──→ LLM（生成当日摘要）
     │                      ├──→ /api/proxy ──→ Guardian 反向代理
-    │                      │
-    └──← 前端静态文件（HTML/CSS/JS）              ├─ v1: retrieve → generate
-                                               ├─ v2: rewrite → retrieve → judge → 条件路由
-                                               └─ v3: evaluate → 选择性扩展 → 多查询融合 → generate
+    │                      
+    └──← 前端静态文件（HTML/CSS/JS）              
 ```
 
 ## 海龟交易法则指标说明

@@ -41,11 +41,15 @@
     <!-- 主内容区 -->
     <main class="main-content">
         <div class="chart-container">
-            <div id="mainChart"></div>
-            <div class="chart-legend">
-                <span class="legend-bb">布林带(20,2)</span>
-                <span class="legend-dc">唐奇安通道(20)</span>
+            <div class="chart-toggles" id="chartToggles">
+                <button data-group="price" class="toggle-btn always-on">走势线</button>
+                <button data-group="ma" class="toggle-btn active">均线</button>
+                <button data-group="candlestick" class="toggle-btn">K线+量</button>
+                <button data-group="bollinger" class="toggle-btn">布林带</button>
+                <button data-group="donchian" class="toggle-btn">唐奇安</button>
             </div>
+            <div class="chart-legend-inline" id="chartLegendInline"></div>
+            <div id="mainChart"></div>
         </div>
         <aside class="side-panel" id="sidePanel">
             <div class="panel-section stats" id="statsPanel">

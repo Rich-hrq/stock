@@ -36,6 +36,7 @@
     │       ├─ services/indicators.py: 
     │       │   ├─ compute_bollinger()  → MA20 ± 2σ
     │       │   ├─ compute_atr()        → 20日真实波幅均值
+    │       │   ├─ compute_ma()         → 简单移动均线 (MA5, MA10)
     │       │   ├─ compute_donchian()   → 20/55日唐奇安通道
     │       │   ├─ judge_trend()        → 价格 vs 唐奇安通道判断趋势
     │       │   └─ generate_advice()    → 综合建议文案
@@ -44,17 +45,24 @@
     │           ├─ 数据记录合并：按位置（iloc[i]）对齐，不依赖日期字符串
     │           │  所有 DataFrame 共享同一 index，避免小时级 K 线互相覆盖
     │           ├─ stats 含 起价/收价/最高价/最低价/区间涨跌/日涨跌/前日收盘/振幅/趋势
-    │           └─ { symbol, name, data[], stats, advice }
+    │           └─ { symbol, name, data[]（含ma5/ma10字段）, stats, advice }
     │
     ├─ 4. charts.js: renderChart(data)
+    │       │
+    │       ├─ 从 data[] 提取各系列数据（走势线/MA5/MA10/MA20/布林/唐奇安/OHLC/成交量）
+    │       ├─ 按分组缓存 series 定义：price / ma / candlestick / bollinger / donchian
+    │       ├─ 根据 groupState 拼装可见 series 数组 → applyVisibility()
+    │       ├─ 图表上方 5 个切换按钮：
+    │       │   [走势线 ·]  [均线 ✓]  [K线+量]  [布林带]  [唐奇安]
+    │       │   走势线始终开启，其他可点击切换显隐
+    │       ├─ 动态内联图例：● 彩色圆点 + 系列名（按当前可见分组实时更新）
     │       ├─ 日期格式化：同日数据显示 HH:MM，多日显示 YYYY-MM-DD
-    │       ├─ ECharts 渲染 K线图 + 布林带 + 唐奇安通道 + 成交量
-    │       └─ 悬浮提示：开/收/低/高 分别映射到 vals[1]~[4]
-    │           （ECharts K线 data 格式为 [dataIndex, open, close, low, high]）
+    │       ├─ 悬浮提示：按可见系列动态显示对应数值
+    │       └─ MA20 系列被均线和布林带两组共享引用，两组同开时去重不重复绘制
     │
     └─ 5. indicators.js: renderIndicators(data)
             渲染统计面板（起始价/当前价/最高价/最低价/区间涨跌/日涨跌/前日收盘/振幅）
-            渲染海龟指标（ATR/N值/布林三轨/唐奇安上下轨）
+            渲染海龟指标（ATR/N值/MA5/MA10/布林三轨/唐奇安上下轨）
             渲染投资建议文案
 ```
 
@@ -85,6 +93,7 @@
     │
     └─ 4. chat.js: 渲染回答 + 来源页码引用
             更新对话历史（保留最近20条）
+            响应含 v3 元数据：is_precise / search_queries / avg_distance
 ```
 
 ### Pipeline C：知识库构建（一次性）
@@ -178,11 +187,27 @@ from pydantic import BaseModel
 
 class ChatRequest(BaseModel):
     message: str
-    history: list[dict] | None = None
+    history: list[dict] | None = None  # [{role, content}, ...]
 
 class ChatResponse(BaseModel):
     answer: str
     sources: list[dict]
+    # v3 额外字段
+    is_precise: bool | None = None          # 问题是否被判定为精确（跳过扩展）
+    search_queries: list[str] | None = None  # 实际使用的检索查询列表
+    avg_distance: float | None = None        # 检索结果的平均向量距离
+
+class PredictRequest(BaseModel):
+    keywords: list[str] = ["nasdaq", "s&p500", ...]
+    limit: int = 500
+    threshold: int = 100000
+
+class NewsSummaryRequest(BaseModel):
+    headlines: list[dict]  # [{title, link}, ...]
+
+class NewsSummaryResponse(BaseModel):
+    summary: str
+    generated_at: str
 ```
 
 路由器通过相对导入引用：
@@ -284,7 +309,7 @@ LangGraph 相比直接调用的优势：
 
 **为什么不用通用知识库？** 通用 LLM 对海龟交易法则的了解可能不准确或不完整。RAG 让模型严格基于原书回答，避免编造。
 
-### 10. RAG 版本演进：v1 → v2 → v3
+### 8. RAG 版本演进：v1 → v2 → v3
 
 本项目实际经历了三次 RAG 流水线迭代，值得作为案例理解：
 
@@ -299,7 +324,7 @@ LangGraph 相比直接调用的优势：
 - 多查询合并检索 > 单一改写查询（多个角度同时搜索，互补盲区）
 - 去掉回环逻辑，降低延迟和 LLM 调用成本
 
-### 11. ChromaDB 向量数据库
+### 9. ChromaDB 向量数据库
 
 ```python
 # 存储
@@ -321,7 +346,7 @@ results = collection.query(
 - 余弦相似度为默认距离度量
 - 轻量级，无需额外服务、适用于小规模知识库
 
-### 9. ECharts 图表渲染
+### 10. ECharts 图表渲染
 
 ```javascript
 option = {
@@ -359,11 +384,12 @@ chart.setOption(option);
     │       ├─ 去重（按 link 去重）
     │       └─ 返回 [{title, link}, ...]
     │
-    └─ 4. news.js: renderNews(items)
+    └─ 4. news.js: renderNews(items) + fetchAISummary(items)
             ├─ 从每个 item.link 提取分类: link.split("/")[3]
             ├─ 渲染分类标签：【CATEGORY】橙色徽章
             ├─ 渲染标题 + 编号
-            └─ 渲染"查看原文"按钮（href="/api/proxy?url=..."）
+            ├─ 渲染"查看原文"按钮（href="/api/proxy?url=..."）
+            └─ 调用 POST /api/news/summary → 见 Pipeline G
 ```
 
 **分类提取逻辑**：
@@ -425,7 +451,41 @@ if parsed.netloc != "www.theguardian.com":
 - 防止被滥用为开放代理（别人用你的服务器访问任意网站）
 - 防止 SSRF 攻击（访问 127.0.0.1、169.254.169.254 等内网地址）
 
-### 10. Polymarket 预测市场
+### Pipeline G：AI 新闻摘要
+
+```
+新闻列表渲染完成后，news.js 自动触发摘要生成
+    │
+    ├─ 1. news.js: fetchAISummary(items)
+    │       POST /api/news/summary  { headlines: [{title, link}, ...] }
+    │
+    ├─ 2. routers/guardian.py: summarize_news()
+    │       校验 headlines 非空，调用 generate_summary()
+    │
+    ├─ 3. services/news_summary.py: generate_summary()
+    │       │
+    │       ├─ 从每条新闻的 link 中提取分类标签（如 [world], [business]）
+    │       ├─ 组装 Prompt：
+    │       │   ├─ 角色：专业的新闻编辑
+    │       │   ├─ 任务：根据标题总结当日主要新闻主题
+    │       │   ├─ 格式：【主题标题】主要内容（中文）
+    │       │   └─ 输入：带分类标签的标题列表
+    │       ├─ ChatAnthropic.invoke(prompt)
+    │       │   └─ 复用 config.py 中的模型配置（ANTHROPIC_MODEL / BASE_URL / API_KEY）
+    │       └─ _extract_answer(): 兼容 Anthropic 原生和 DeepSeek 两种响应格式
+    │
+    └─ 4. news.js: formatSummary(summary)
+            ├─ 转义 HTML → 【主题】加粗 → 换行转 <br>
+            └─ 渲染到 aiSummaryBody 区域
+```
+
+**设计要点**：
+- LLM 调用复用了 RAG 的 Anthropic 配置（`ANTHROPIC_MODEL`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_API_KEY`），无需额外配置
+- `_extract_answer()` 兼容了两种响应格式：标准 Anthropic（`response.content` 为 list[ContentBlock]）和 DeepSeek（`response.content` 为纯文本字符串）
+- 新闻分类标签从 URL 路径中提取（与前端逻辑一致），提升标题的上下文信息量
+- 摘要生成采用 `temperature=0.5`，在创造性与准确性之间取平衡
+
+### 11. Polymarket 预测市场
 
 ```python
 # Gamma API 是 Polymarket 的公开数据接口，无需 API Key
@@ -439,7 +499,7 @@ response = requests.get(url, params=params, proxies={"http": proxy, "https": pro
 - `volume` 是美元计价的累计交易量，用于判断市场活跃度
 - 国内访问需设置代理，与 yfinance 共用 `HTTP_PROXY` 配置
 
-### 11. BeautifulSoup 网页爬虫
+### 12. BeautifulSoup 网页爬虫
 
 ```python
 # BeautifulSoup 将 HTML 文本解析为 DOM 树，支持 CSS 选择器风格的查找

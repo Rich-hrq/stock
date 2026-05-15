@@ -84,6 +84,8 @@
         let lastBBLower = null;
         let lastDCHigh = null;
         let lastDCLow = null;
+        let lastMA5 = null;
+        let lastMA10 = null;
 
         for (let i = records.length - 1; i >= 0; i--) {
             const r = records[i];
@@ -93,7 +95,9 @@
             if (lastBBLower == null && r.boll_lower != null) lastBBLower = r.boll_lower;
             if (lastDCHigh == null && r.dc_high_20 != null) lastDCHigh = r.dc_high_20;
             if (lastDCLow == null && r.dc_low_20 != null) lastDCLow = r.dc_low_20;
-            if (lastATR && lastBBUpper && lastDCHigh) break;
+            if (lastMA5 == null && r.ma5 != null) lastMA5 = r.ma5;
+            if (lastMA10 == null && r.ma10 != null) lastMA10 = r.ma10;
+            if (lastATR && lastBBUpper && lastDCHigh && lastMA5 && lastMA10) break;
         }
 
         container.innerHTML = `
@@ -101,6 +105,14 @@
                 <div class="indicator-item">
                     <div class="ind-value">${lastATR != null ? lastATR.toFixed(2) : "—"}</div>
                     <div class="ind-label">ATR(20) / N值</div>
+                </div>
+                <div class="indicator-item">
+                    <div class="ind-value">${lastMA5 != null ? lastMA5.toFixed(2) : "—"}</div>
+                    <div class="ind-label">MA5</div>
+                </div>
+                <div class="indicator-item">
+                    <div class="ind-value">${lastMA10 != null ? lastMA10.toFixed(2) : "—"}</div>
+                    <div class="ind-label">MA10</div>
                 </div>
                 <div class="indicator-item">
                     <div class="ind-value">${lastBBMiddle != null ? lastBBMiddle.toFixed(2) : "—"}</div>
