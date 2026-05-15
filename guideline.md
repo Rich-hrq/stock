@@ -24,9 +24,14 @@
     │       │
     │       ├─ services/market_data.py: fetch_index_data()
     │       │   ├─ 设置代理（all_proxy，因国内无法直连 Yahoo）
-    │       │   ├─ 自动选择数据粒度（≤7天用1h，否则用1d）
+    │       │   ├─ auto_interval: 同日(start==end)用1h，跨日用1d
+    │       │   │   （日线数据与 Yahoo Finance 网页端 OHLC 完全一致）
     │       │   ├─ yfinance.Ticker(symbol).history(start, end, interval)
     │       │   └─ 返回 DataFrame（列名统一小写：open/high/low/close/volume）
+    │       │
+    │       ├─ 额外获取前日收盘：fetch_index_data(prev_start, end, "1d")
+    │       │   取 df_daily["close"].iloc[-2] 作为前日收盘
+    │       │   用于计算日涨跌 (P→C) = (收价−前收)/前收，与 Yahoo Finance 对齐
     │       │
     │       ├─ services/indicators.py: 
     │       │   ├─ compute_bollinger()  → MA20 ± 2σ
@@ -36,13 +41,19 @@
     │       │   └─ generate_advice()    → 综合建议文案
     │       │
     │       └─ routers/index_data.py: 组装 JSON 返回
-    │           { symbol, name, data[], stats, advice }
+    │           ├─ 数据记录合并：按位置（iloc[i]）对齐，不依赖日期字符串
+    │           │  所有 DataFrame 共享同一 index，避免小时级 K 线互相覆盖
+    │           ├─ stats 含 起价/收价/最高价/最低价/区间涨跌/日涨跌/前日收盘/振幅/趋势
+    │           └─ { symbol, name, data[], stats, advice }
     │
     ├─ 4. charts.js: renderChart(data)
-    │       ECharts 渲染 K线图 + 布林带 + 唐奇安通道 + 成交量
+    │       ├─ 日期格式化：同日数据显示 HH:MM，多日显示 YYYY-MM-DD
+    │       ├─ ECharts 渲染 K线图 + 布林带 + 唐奇安通道 + 成交量
+    │       └─ 悬浮提示：开/收/低/高 分别映射到 vals[1]~[4]
+    │           （ECharts K线 data 格式为 [dataIndex, open, close, low, high]）
     │
     └─ 5. indicators.js: renderIndicators(data)
-            渲染统计面板（起价/收价/涨跌幅/振幅）
+            渲染统计面板（起始价/当前价/最高价/最低价/区间涨跌/日涨跌/前日收盘/振幅）
             渲染海龟指标（ATR/N值/布林三轨/唐奇安上下轨）
             渲染投资建议文案
 ```

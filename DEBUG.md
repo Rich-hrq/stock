@@ -190,3 +190,52 @@ min_price   = df["low"].min()         # 最低价 = 真实日内最低
 ```
 
 涨跌幅、振幅、最高/最低日期也相应从 `high`/`low` 列取值。
+
+---
+
+## 小时级 K 线数据在序列化时丢失（dict key 冲突）
+
+**现象**：1 天视图（自动选择 1h 间隔）下，7 根小时 K 线只剩 1 根，且该 K 线的 OHLC 值与 stats 面板不一致。例如 stats 显示起价=29379，但图表只显示一根 open=29592 的 K 线。
+
+**原因**：`index_data.py` 的 `df_to_records` 使用 `str(d.date())` 作为日期字段，同一日的 7 根小时 K 线全部获得相同的日期字符串 `"2026-05-14"`。后续 `dates_index` dict 以此字符串为 key，导致 7 根 K 线互相覆盖，最终只剩最后一根。stats 计算用的是原始 DataFrame（`df["open"].iloc[0]`），图表用的是被覆盖后的数据，两者不一致。
+
+**解决**：
+1. 移除 `df_to_records` 函数，改为直接遍历 DataFrame 按位置（`iloc[i]`）逐行构建记录
+2. 日期字段改用 `idx_val.isoformat()` 保留完整时间（如 `2026-05-14T09:30:00-04:00`），确保每根 K 线有唯一 key
+3. 所有技术指标（布林带/ATR/唐奇安）与 DataFrame 共享同一 index，通过相同的 `iloc[i]` 对齐取值
+4. 前端 `charts.js` 新增日期格式化：同日数据显示 `HH:MM`，多日显示 `YYYY-MM-DD`
+
+---
+
+## yfinance 1h 与 1d 间隔的 OHLC 数据不一致
+
+**现象**：网站 stats 与 Yahoo Finance 网页端显示的数值不一致。例如 `^NDX` 5 月 14 日：网站起价=29379.23，Yahoo Finance Open=29372.65（差 6.58 点）；网站最低价=29353.50，Yahoo Finance Low=29350.10（差 3.40 点）。
+
+**原因**：`auto_interval` 对 ≤7 天的范围强制使用 `1h`（小时线），但 yfinance 的小时线数据和日线数据来源于 Yahoo 不同的数据端点，同一交易日的首根小时 K 线开盘价与日线开盘价存在微小差异。
+
+**解决**：
+1. 修改 `auto_interval`：同日查询（start==end）用 `1h`，跨日查询（start<end）统一用 `1d`
+2. 日线数据与 Yahoo Finance 网页端 OHLC 完全一致
+3. 新增「前日收盘」和「日涨跌 (P→C)」指标，与 Yahoo Finance 的 % Change 对齐
+
+---
+
+## ECharts K线图 tooltip 数据索引偏移
+
+**现象**：悬浮提示中 OHLC 值显示为索引数字（0, 1, 2, 3…）而非实际价格。
+
+**原因**：错误地将 K线 data 格式理解为 `[open, close, low, high]`（索引 0~3）。
+实际 ECharts candlestick 系列的 tooltip `data` 格式为 `[dataIndex, open, close, low, high]`，
+索引 0 是数据序号，索引 1~4 才是 OHLC 价格。
+
+**解决**：tooltip 取值使用 `vals[1]`~`vals[4]`（开/收/低/高），不要用 `vals[0]`。
+
+---
+
+## 前端静态文件被浏览器缓存，修改后页面无变化
+
+**现象**：修改 JS/CSS 文件后刷新页面，功能无变化。
+
+**原因**：浏览器缓存了旧版本的静态资源。
+
+**解决**：强制刷新（`Cmd+Shift+R`），或打开 DevTools → Network → Disable cache。

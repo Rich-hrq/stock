@@ -17,17 +17,18 @@ def _set_proxy() -> None:
 
 
 def auto_interval(start_date: str, end_date: str) -> str:
-    """根据时间跨度自动选择合适的数据粒度。"""
+    """根据时间跨度自动选择合适的数据粒度。
+
+    同日查询用小时线以展示日内细节，跨日查询用日线以确保 OHLC 与 Yahoo Finance 一致。
+    （yfinance 1h 和 1d 间隔的首根开盘价可能不一致，日线数据与网页端对齐）
+    """
     start = datetime.strptime(start_date, "%Y-%m-%d")
     end = datetime.strptime(end_date, "%Y-%m-%d")
     days = (end - start).days
 
-    if days <= 1:
-        return "1h"
-    elif days <= 7:
-        return "1h"
-    else:
-        return "1d"
+    if days <= 0:
+        return "1h"    # 同日：日内细节
+    return "1d"         # 跨日：日线，与 Yahoo Finance 对齐
 
 
 def fetch_index_data(

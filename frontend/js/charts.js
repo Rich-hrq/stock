@@ -28,8 +28,17 @@
             return;
         }
 
-        // 准备各系列数据
-        const dates = records.map((r) => r.date);
+        // 格式化日期标签：同日数据只显示时间，多日数据只显示日期
+        const rawDates = records.map((r) => r.date);
+        const sameDay = rawDates.every((d) => d.slice(0, 10) === rawDates[0].slice(0, 10));
+        const dates = rawDates.map((d) => {
+            if (sameDay) {
+                // 提取 HH:MM，兼容 "2026-05-14T09:30:00" 或 "2026-05-14T09:30:00-04:00"
+                const timeMatch = d.match(/T(\d{2}:\d{2})/);
+                return timeMatch ? timeMatch[1] : d;
+            }
+            return d.slice(0, 10); // YYYY-MM-DD
+        });
         const ohlc = records.map((r) => [r.open, r.close, r.low, r.high]);
         const volumes = records.map((r) => [r.volume || 0, r.close >= r.open ? 1 : -1]);
         const bbUpper = records.map((r) => r.boll_upper);
