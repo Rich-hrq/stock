@@ -193,8 +193,8 @@
                 value: "¥" + parseFloat(m.amount_cny).toFixed(0),
                 symbol: "arrow",
                 symbolRotate: isBuy ? 0 : 180,
-                symbolSize: 14,
-                symbolOffset: [0, isBuy ? -10 : 10],
+                symbolSize: 16,
+                symbolOffset: [0, isBuy ? -12 : 12],
                 itemStyle: { color: isBuy ? "#4caf50" : "#ef5350" },
                 label: {
                     show: true,

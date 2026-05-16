@@ -346,3 +346,22 @@ def verify_password(plain: str, hashed: str) -> bool:
 from dotenv import load_dotenv
 load_dotenv()
 ```
+
+---
+
+## 移动端看不到交易标记 — 静默 catch 吞掉错误信息
+
+**现象**：电脑端登录后主图走势线上能显示 buy/sell 标记，手机端登录后看不到。
+
+**原因**：`app.js` 中拉取交易标记的 `fetch()` 外层 `catch {}` 为空块，网络错误、API 401/500 等全部静默忽略，用户和开发者都无法感知失败原因。手机端可能因网络延迟更高、浏览器缓存旧版 JS 等原因导致请求失败。
+
+**解决**：
+1. 在 `catch` 和 `!mRes.ok` 分支中添加 `console.warn/log` 输出
+2. 在 `index.html` 图例区旁新增 `#markerHint` 可视元素，实时显示标记加载状态：
+   - `✓ N 笔交易标记` — 成功
+   - `当前范围无交易` — token 有效但时间范围内无匹配交易
+   - 空白 — 未登录（无 portfolio_token）
+
+**移动端调试方法**：
+- 连接手机到电脑，Chrome 地址栏 `chrome://inspect` 远程调试 → 看 Console 日志
+- Safari：手机设置 → Safari → 高级 → Web Inspector，Mac Safari → 开发 → 选择设备

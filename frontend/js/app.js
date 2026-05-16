@@ -124,21 +124,39 @@
             const portfolioToken = localStorage.getItem("portfolio_token");
             if (portfolioToken) {
                 try {
-                    const mRes = await fetch(
-                        `/api/portfolio/transactions/markers?symbol=${encodeURIComponent(state.currentSymbol)}&start_date=${startDate}&end_date=${endDate}`,
-                        { headers: { Authorization: `Bearer ${portfolioToken}` } }
-                    );
+                    const markerUrl = `/api/portfolio/transactions/markers?symbol=${encodeURIComponent(state.currentSymbol)}&start_date=${startDate}&end_date=${endDate}`;
+                    const mRes = await fetch(markerUrl, {
+                        headers: { Authorization: `Bearer ${portfolioToken}` },
+                    });
                     if (mRes.ok) {
                         markers = await mRes.json();
+                        console.log(`[交易标记] 加载成功: ${markers.length} 条, symbol=${state.currentSymbol}`);
+                    } else {
+                        console.warn(`[交易标记] API 返回 ${mRes.status}: ${mRes.statusText}`);
                     }
-                } catch {
-                    // 静默忽略，不影响图表
+                } catch (err) {
+                    console.warn("[交易标记] 请求失败:", err.message || err);
                 }
+            } else {
+                console.log("[交易标记] 未登录（无 portfolio_token）");
             }
 
             // 更新图表
             if (typeof renderChart === "function") {
                 renderChart(data, markers);
+            }
+            // 标记加载状态提示（页面可见 + 控制台）
+            const markerHintEl = document.getElementById("markerHint");
+            if (portfolioToken) {
+                if (markers.length > 0) {
+                    console.log(`[交易标记] 已渲染 ${markers.length} 个标记到走势线`);
+                    if (markerHintEl) markerHintEl.textContent = `✓ ${markers.length} 笔交易标记`;
+                } else {
+                    console.log("[交易标记] token 有效但当前范围无匹配交易");
+                    if (markerHintEl) markerHintEl.textContent = "当前范围无交易";
+                }
+            } else {
+                if (markerHintEl) markerHintEl.textContent = "";
             }
             // 更新指标面板
             if (typeof renderIndicators === "function") {
