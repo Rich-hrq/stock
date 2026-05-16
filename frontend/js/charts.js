@@ -131,7 +131,8 @@
     bindToggles();
 
     /** 主渲染函数 */
-    function renderChart(data) {
+    function renderChart(data, markers) {
+        markers = markers || [];
         var chart = getChart();
         if (!chart) return;
 
@@ -173,6 +174,38 @@
 
         var hasVolume = volumes.some(function (v) { return v[0] > 0; });
 
+        // ---- 构建日期→close 映射（用于匹配交易标记到图表坐标） ----
+        var dateToIdx = {};
+        rawDates.forEach(function (d, i) {
+            var key = d.slice(0, 10);
+            dateToIdx[key] = i;
+        });
+
+        // ---- 构建交易标记的 markPoint data ----
+        var markPointData = [];
+        markers.forEach(function (m) {
+            var idx = dateToIdx[m.trade_date];
+            if (idx === undefined) return;
+            var isBuy = m.direction === "buy";
+            markPointData.push({
+                name: (isBuy ? "买入" : "卖出") + " ¥" + parseFloat(m.amount_cny).toFixed(0),
+                coord: [dates[idx], closeLine[idx]],
+                value: "¥" + parseFloat(m.amount_cny).toFixed(0),
+                symbol: "arrow",
+                symbolRotate: isBuy ? 0 : 180,
+                symbolSize: 14,
+                symbolOffset: [0, isBuy ? -10 : 10],
+                itemStyle: { color: isBuy ? "#4caf50" : "#ef5350" },
+                label: {
+                    show: true,
+                    position: isBuy ? "top" : "bottom",
+                    fontSize: 10,
+                    color: isBuy ? "#4caf50" : "#ef5350",
+                    formatter: function (p) { return p.value; },
+                },
+            });
+        });
+
         // ---- 共享系列：MA20 / 布林中轨（同一条线，两组共用） ----
         var ma20Series = {
             name: "MA20", type: "line", data: bbMiddle,
@@ -186,6 +219,10 @@
                 name: "走势线", type: "line", data: closeLine,
                 lineStyle: { color: "#e0e6ed", width: 1.5 }, symbol: "none",
                 xAxisIndex: 0, yAxisIndex: 0,
+                markPoint: markPointData.length > 0 ? {
+                    data: markPointData,
+                    animation: false,
+                } : undefined,
             },
         ];
 

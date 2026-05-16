@@ -100,6 +100,40 @@ class TransactionOut(BaseModel):
         from_attributes = True
 
 
+class TransactionMarker(BaseModel):
+    """图表交易标记"""
+    trade_date: str
+    direction: str
+    amount_cny: Decimal
+    close_price_usd: Decimal
+
+
+class InvestmentPlanCreate(BaseModel):
+    """新增定投计划请求"""
+    symbol: str
+    amount_cny: Decimal
+    frequency: str  # weekly / monthly
+    day_of_week: int | None = None  # 0=周一..6=周日
+    day_of_month: int | None = None  # 1-28
+
+
+class InvestmentPlanOut(BaseModel):
+    """定投计划响应"""
+    id: int
+    user_id: int
+    symbol: str
+    amount_cny: Decimal
+    frequency: str
+    day_of_week: int | None = None
+    day_of_month: int | None = None
+    enabled: bool
+    last_executed: date | None = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class PositionSummary(BaseModel):
     """单只指数的持仓汇总"""
     symbol: str

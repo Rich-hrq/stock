@@ -23,6 +23,23 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(default=func.now(), comment="注册时间")
 
 
+class InvestmentPlan(Base):
+    """定投计划表。"""
+
+    __tablename__ = "investment_plans"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), comment="所属用户")
+    symbol: Mapped[str] = mapped_column(String(20), comment="指数代码")
+    amount_cny: Mapped[Decimal] = mapped_column(Numeric(12, 2), comment="每次买入金额")
+    frequency: Mapped[str] = mapped_column(String(10), comment="weekly 或 monthly")
+    day_of_week: Mapped[int | None] = mapped_column(comment="每周几 (0=周一..6=周日)", nullable=True)
+    day_of_month: Mapped[int | None] = mapped_column(comment="每月几号 (1-28)", nullable=True)
+    enabled: Mapped[bool] = mapped_column(default=True, comment="是否启用")
+    last_executed: Mapped[date | None] = mapped_column(comment="上次执行日期", nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=func.now(), comment="创建时间")
+
+
 class Transaction(Base):
     """交易记录表。"""
 

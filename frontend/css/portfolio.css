@@ -368,6 +368,113 @@ body {
     color: var(--red);
 }
 
+/* ===== 定投计划 ===== */
+.plan-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 24px;
+}
+
+.subsection-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 16px;
+}
+
+.plan-list {
+    margin-bottom: 20px;
+}
+
+.plan-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+}
+.plan-card:last-child {
+    border-bottom: none;
+    margin-bottom: 16px;
+}
+
+.plan-info {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.plan-symbol {
+    font-weight: 600;
+    color: var(--accent);
+}
+
+.plan-detail {
+    color: var(--text);
+}
+
+.plan-status {
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+.plan-active { color: var(--green); background: rgba(76,175,80,0.1); }
+.plan-paused { color: var(--text-dim); background: rgba(136,153,170,0.1); }
+
+.plan-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-sm {
+    background: none;
+    border: 1px solid var(--border);
+    padding: 3px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    transition: all 0.2s;
+}
+.btn-toggle {
+    color: var(--text-dim);
+}
+.btn-toggle:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.plan-error {
+    color: var(--red);
+    font-size: 13px;
+    margin-bottom: 8px;
+    min-height: 18px;
+}
+
+.plan-form .btn-primary {
+    width: auto;
+    padding: 8px 24px;
+}
+
+@media (max-width: 700px) {
+    .plan-form .form-row {
+        grid-template-columns: 1fr 1fr;
+    }
+    .plan-card {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    .plan-form .form-row {
+        grid-template-columns: 1fr;
+    }
+}
+
 .empty-hint {
     text-align: center;
     padding: 40px 20px;

@@ -11,6 +11,8 @@
 - The Guardian 新闻资讯（独立页面，爬取最新报道，按分类标签展示，支持原文链接跳转，AI 自动生成当日新闻摘要）
 - Guardian 反向代理（通过后端代理访问新闻原文，\<base\> 标签注入 + 域名白名单防滥用）
 - 持仓记录（登录后可记录美股指数买卖操作，自动查询收盘价和汇率，计算持仓盈亏）
+- 定投计划（设置每周/每月自动买入，到期自动执行，幂等防重复）
+- 走势线交易标记（登录后在主图走势线上叠加买卖标记，标注金额）
 
 ## 目录结构
 
@@ -41,7 +43,7 @@ stock_website/
 │   ├── schemas.py            # Pydantic 请求/响应模型（接口格式定义）
 │   ├── requirements.txt      # Python 依赖
 │   ├── database.py           # 数据库引擎与会话管理（SQLAlchemy async + aiomysql）
-│   ├── models.py             # SQLAlchemy ORM 模型（User, Transaction）
+│   ├── models.py             # SQLAlchemy ORM 模型（User, Transaction, InvestmentPlan）
 │   ├── auth.py               # 用户认证工具（JWT + bcrypt）
 │   ├── routers/
 │   │   ├── __init__.py
@@ -254,7 +256,14 @@ lsof -ti:8000 | xargs kill 2>/dev/null; sleep 1
 | POST | `/api/portfolio/transactions` | 新增交易记录（需登录） |
 | GET | `/api/portfolio/transactions` | 获取所有交易记录（需登录） |
 | DELETE | `/api/portfolio/transactions/{id}` | 删除交易记录（需登录） |
+| GET | `/api/portfolio/transactions/markers` | 交易标记（需登录，用于图表叠加 buy/sell） |
 | GET | `/api/portfolio/summary` | 持仓汇总（需登录） |
+| GET | `/api/portfolio/plans` | 列出定投计划（需登录） |
+| POST | `/api/portfolio/plans` | 新增定投计划（需登录） |
+| PUT | `/api/portfolio/plans/{id}` | 更新定投计划（需登录） |
+| PATCH | `/api/portfolio/plans/{id}/toggle` | 启用/暂停定投计划（需登录） |
+| DELETE | `/api/portfolio/plans/{id}` | 删除定投计划（需登录） |
+| POST | `/api/portfolio/plans/execute` | 执行到期定投计划，自动创建买入交易（需登录） |
 | GET | `/api/health` | 健康检查 |
 
 ## 技术架构
@@ -274,6 +283,9 @@ lsof -ti:8000 | xargs kill 2>/dev/null; sleep 1
     │                      ├──→ /api/proxy ──→ Guardian 反向代理
     │                      ├──→ /api/auth/* ──→ MySQL（用户注册/登录 + JWT）
     │                      ├──→ /api/portfolio/* ──→ MySQL + yfinance + 汇率API
+    │                      │     ├─ transactions CRUD + summary（加权平均成本法）
+    │                      │     ├─ plans CRUD + execute（定投到期自动买入，幂等）
+    │                      │     └─ markers（交易标记供前端图表叠加）
     │
     └──← 前端静态文件（HTML/CSS/JS）
 ```

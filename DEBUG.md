@@ -326,6 +326,15 @@ def verify_password(plain: str, hashed: str) -> bool:
 2. `requirements.txt` 中固定 `bcrypt<4.1`（防止未来 5.x 被安装）。
 3. 新增 `python-dotenv>=1.0.0` 依赖，在 `main.py` 顶部调用 `load_dotenv()` 自动加载 `.env`。
 
+## 走势线交易标记看不到 — `closeLine` 引用在变量定义之前
+
+**现象**：主页图表走势线上没有 buy/sell 标记，浏览器 Console 有 `TypeError: Cannot read properties of undefined`。
+
+**原因**：在 `charts.js` 中构建 markPoint data 时引用了 `closeLine[idx]`，但 `closeLine` 变量在后面的数据提取步骤才定义。markPoint 构建代码的位置（日期格式化之后）早于数据提取（`records.map(r => r.close)`）。
+
+**解决**：将 markPoint 构建代码移到最后（`cachedGroups.price` 之前、数据提取之后），确保 `closeLine` 已定义。
+
+---
 ### .env 文件不生效
 
 **现象**：在 `backend/.env` 中配置了 MySQL 环境变量，启动后 `MYSQL_HOST` 仍为空，持仓模块不加载。

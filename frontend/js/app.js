@@ -119,9 +119,26 @@
             }
             const data = await res.json();
 
+            // 拉取交易标记（如果有登录态）
+            let markers = [];
+            const portfolioToken = localStorage.getItem("portfolio_token");
+            if (portfolioToken) {
+                try {
+                    const mRes = await fetch(
+                        `/api/portfolio/transactions/markers?symbol=${encodeURIComponent(state.currentSymbol)}&start_date=${startDate}&end_date=${endDate}`,
+                        { headers: { Authorization: `Bearer ${portfolioToken}` } }
+                    );
+                    if (mRes.ok) {
+                        markers = await mRes.json();
+                    }
+                } catch {
+                    // 静默忽略，不影响图表
+                }
+            }
+
             // 更新图表
             if (typeof renderChart === "function") {
-                renderChart(data);
+                renderChart(data, markers);
             }
             // 更新指标面板
             if (typeof renderIndicators === "function") {

@@ -56,8 +56,9 @@
         $("#authView").style.display = "none";
         $("#mainView").style.display = "block";
         renderTopbar(username);
-        // 默认日期为今天
+        // 默认日期为今天，默认金额 200
         $("#txDate").value = new Date().toISOString().split("T")[0];
+        $("#txAmount").value = "200";
         refreshData();
     }
 
@@ -158,7 +159,11 @@
 
     // ---- 数据刷新 ----
     async function refreshData() {
-        await Promise.all([loadSummary(), loadHistory()]);
+        await Promise.all([
+            loadSummary(),
+            loadHistory(),
+            executePlans().then(() => loadPlans()),
+        ]);
     }
 
     // ---- 持仓汇总 ----
@@ -306,10 +311,140 @@
         });
     }
 
+    // ---- 定投计划 ----
+    const WEEKDAY_NAMES = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+
+    function initPlanForm() {
+        // 频率切换：显示/隐藏周几/几号
+        $("#planFreq").addEventListener("change", () => {
+            const freq = $("#planFreq").value;
+            $("#planDayWeekGroup").style.display = freq === "weekly" ? "" : "none";
+            $("#planDayMonthGroup").style.display = freq === "monthly" ? "" : "none";
+        });
+
+        $("#planForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const errEl = $("#planError");
+            errEl.textContent = "";
+
+            const symbol = $("#planSymbol").value;
+            const amount = parseFloat($("#planAmount").value);
+            const frequency = $("#planFreq").value;
+            const day_of_week = parseInt($("#planDayWeek").value);
+            const day_of_month = parseInt($("#planDayMonth").value);
+
+            if (!amount || amount <= 0) {
+                errEl.textContent = "请填写有效金额";
+                return;
+            }
+
+            const body = { symbol, amount_cny: amount, frequency };
+            if (frequency === "weekly") body.day_of_week = day_of_week;
+            else body.day_of_month = day_of_month;
+
+            try {
+                await api("/api/portfolio/plans", {
+                    method: "POST",
+                    body: JSON.stringify(body),
+                });
+                $("#planAmount").value = "200";
+                $("#planError").textContent = "";
+                loadPlans();
+            } catch (err) {
+                errEl.textContent = err.message;
+            }
+        });
+    }
+
+    async function executePlans() {
+        try {
+            const result = await api("/api/portfolio/plans/execute", { method: "POST" });
+            if (result.executed > 0) {
+                // 有新的自动交易，静默刷新历史
+                return;
+            }
+        } catch (err) {
+            console.error("执行定投计划失败:", err);
+        }
+    }
+
+    async function loadPlans() {
+        try {
+            const data = await api("/api/portfolio/plans");
+            renderPlans(data);
+        } catch (err) {
+            console.error("加载定投计划失败:", err);
+        }
+    }
+
+    function renderPlans(plans) {
+        const container = $("#planList");
+        const emptyEl = $("#planEmpty");
+
+        if (!plans || plans.length === 0) {
+            container.innerHTML = "";
+            emptyEl.style.display = "block";
+            return;
+        }
+
+        emptyEl.style.display = "none";
+        container.innerHTML = plans
+            .map((p) => {
+                const freqText = p.frequency === "weekly"
+                    ? `每周${WEEKDAY_NAMES[p.day_of_week] || p.day_of_week}`
+                    : `每月${p.day_of_month}号`;
+                const statusText = p.enabled ? "启用中" : "已暂停";
+                const statusClass = p.enabled ? "plan-active" : "plan-paused";
+                return `
+                <div class="plan-card">
+                    <div class="plan-info">
+                        <span class="plan-symbol">${INDEX_NAMES[p.symbol] || p.symbol}</span>
+                        <span class="plan-detail">${freqText} 买入 ¥${parseFloat(p.amount_cny).toFixed(2)}</span>
+                        <span class="plan-status ${statusClass}">${statusText}</span>
+                    </div>
+                    <div class="plan-actions">
+                        <button class="btn-sm btn-toggle" data-id="${p.id}" data-action="toggle">
+                            ${p.enabled ? "暂停" : "启用"}
+                        </button>
+                        <button class="btn-sm btn-delete" data-id="${p.id}" data-action="delete">删除</button>
+                    </div>
+                </div>
+                `;
+            })
+            .join("");
+
+        // 绑定按钮事件
+        container.querySelectorAll("[data-action='toggle']").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+                try {
+                    await api(`/api/portfolio/plans/${btn.dataset.id}/toggle`, {
+                        method: "PATCH",
+                    });
+                    loadPlans();
+                } catch (err) {
+                    alert(err.message);
+                }
+            });
+        });
+
+        container.querySelectorAll("[data-action='delete']").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+                if (!confirm("确定删除这个定投计划？")) return;
+                try {
+                    await api(`/api/portfolio/plans/${btn.dataset.id}`, { method: "DELETE" });
+                    loadPlans();
+                } catch (err) {
+                    alert(err.message);
+                }
+            });
+        });
+    }
+
     // ---- 初始化 ----
     async function init() {
         initAuth();
         initTradeForm();
+        initPlanForm();
 
         // 检查登录状态
         const token = getToken();

@@ -73,7 +73,7 @@
                     </div>
                     <div class="form-group">
                         <label for="txAmount">人民币金额 (¥)</label>
-                        <input type="number" id="txAmount" placeholder="如 10000" min="0.01" step="0.01" required>
+                        <input type="number" id="txAmount" placeholder="200" value="200" min="0.01" step="0.01" required>
                     </div>
                 </div>
                 <div class="form-hint">
@@ -100,6 +100,56 @@
                 <!-- JS 动态填充 -->
             </div>
             <div id="historyEmpty" class="empty-hint" style="display:none;">暂无交易记录</div>
+        </section>
+
+        <!-- 定投计划 -->
+        <section class="plan-section">
+            <h2 class="section-title">定投计划</h2>
+            <div id="planList" class="plan-list">
+                <!-- JS 动态填充 -->
+            </div>
+            <div id="planEmpty" class="empty-hint" style="display:none;">暂无定投计划</div>
+            <form id="planForm" class="plan-form">
+                <h3 class="subsection-title">新增定投</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="planSymbol">指数</label>
+                        <select id="planSymbol" required>
+                            <option value="^GSPC">标普500</option>
+                            <option value="^NDX">纳斯达克100</option>
+                            <option value="^IXIC">纳斯达克综合</option>
+                            <option value="^DJI">道琼斯工业</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="planAmount">每次买入金额 (¥)</label>
+                        <input type="number" id="planAmount" value="200" min="0.01" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="planFreq">频率</label>
+                        <select id="planFreq" required>
+                            <option value="weekly">每周</option>
+                            <option value="monthly">每月</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="planDayWeekGroup">
+                        <label for="planDayWeek">周几</label>
+                        <select id="planDayWeek">
+                            <option value="0">周一</option>
+                            <option value="1">周二</option>
+                            <option value="2">周三</option>
+                            <option value="3">周四</option>
+                            <option value="4">周五</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="planDayMonthGroup" style="display:none;">
+                        <label for="planDayMonth">几号</label>
+                        <input type="number" id="planDayMonth" value="1" min="1" max="28" step="1">
+                    </div>
+                </div>
+                <div class="plan-error" id="planError"></div>
+                <button type="submit" class="btn-primary">添加定投计划</button>
+            </form>
         </section>
     </div>
 
