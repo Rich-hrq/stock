@@ -129,6 +129,30 @@ else:
 
 ---
 
+## Nginx 静态文件 403 Forbidden
+
+**现象**：nginx 配置了直接 serve 静态文件（CSS/JS/HTML），但浏览器访问返回 403
+
+**原因**：nginx worker 进程以 `www-data` 用户运行，而项目目录在 `/home/rich/stock/...` 下。Ubuntu 默认 `/home/rich` 权限为 750（`rwxr-x---`），`www-data` 无法穿越（无 execute 权限进入 `/home/rich`）
+
+**解决**：去掉 nginx 配置中的静态文件 `location` 块，所有请求统一反向代理到 uvicorn。静态文件优化对于此类小规模部署并非必要
+
+---
+
+## Nginx 反向代理必须透传的 Header
+
+**注意**：通过 nginx 代理后，若不设置以下 header，后端日志中的客户端 IP 会全部显示 127.0.0.1
+
+**必须设置**（每个 `location` 块都要加）：
+```nginx
+proxy_set_header Host $host;
+proxy_set_header X-Real-IP $remote_addr;
+proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+proxy_set_header X-Forwarded-Proto $scheme;
+```
+
+---
+
 ## v2 改写可能降低精确问题的检索质量
 
 **现象**：v2 将 "海龟交易法则的入市策略是什么？" 改写为 "海龟交易法则 入市 策略 突破 做多 做空" 后，检索来源从 p238（正确答案页）变为 p9（目录页），回答质量下降
@@ -167,6 +191,29 @@ cd /Users/hrq/Coding/stock/stock_website
 - 如果页面已有 `<base>` 标签，需用正则替换而非重复插入（`services/proxy.py` 已处理）
 - Guardian CDN 资源（`assets.guim.co.uk`、`i.guim.co.uk`）使用绝对 URL，不受 `<base>` 影响，浏览器直接请求
 - 域名白名单仅校验 `netloc`（`www.theguardian.com`），不含子域名变体；如需支持 `amp.theguardian.com` 等，应在白名单中追加
+
+---
+
+## Git merge 后 uvicorn 未重启导致 404
+
+**现象**：`git merge` 后重新加载 nginx，所有页面返回 404，但 `/api/health` 和 `/docs` 正常。
+
+**原因**：uvicorn 启动时未加 `--reload` 参数，进程常驻内存，加载的是旧代码。本次 merge 中 `config.py` 的 `STATIC_DIR` 从 `backend/static/`（已删除）变更为 `frontend/`，旧进程仍查找不存在的目录，所有静态文件请求都返回 404。
+
+**解决**：
+```bash
+# 1. 找到 uvicorn 进程并杀死
+pkill -f "uvicorn backend.main"
+
+# 2. 确认端口释放
+lsof -ti:8000 | xargs kill -9
+
+# 3. 用正确的 conda 环境重启（uvicorn 装在 stock 环境，非 base）
+conda activate stock
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 &
+```
+
+**教训**：长时间运行的服务若未开启 `--reload`，merge 或 pull 新代码后需要手动重启。
 
 ---
 
