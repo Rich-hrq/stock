@@ -13,6 +13,7 @@
 - 持仓记录（登录后可记录美股指数买卖操作，自动查询收盘价和汇率，计算持仓盈亏）
 - 定投计划（设置每周/每月自动买入，到期自动执行，幂等防重复）
 - 走势线交易标记（登录后在主图走势线上叠加买卖标记，标注金额）
+- 市场状态指示器（主页实时显示美股是否开盘，双时区展示盘前/盘中/盘后/休市状态，自动识别夏令时）
 
 ## 目录结构
 
@@ -52,6 +53,7 @@ stock_website/
 │   │   ├── prediction.py     # 预测市场 API（/api/predict）
 │   │   ├── guardian.py       # 新闻爬取 API（/api/guardian_news）
 │   │   ├── proxy.py          # 反向代理 API（/api/proxy）
+│   │   ├── market_status.py  # 市场状态 API（/api/market/status）
 │   │   ├── auth.py           # 用户认证 API（/api/auth/*）
 │   │   └── portfolio.py      # 持仓交易 API（/api/portfolio/*）
 │   ├── services/
@@ -62,6 +64,7 @@ stock_website/
 │   │   ├── guardian_news.py  # The Guardian 新闻爬取（BeautifulSoup）
 │   │   ├── news_summary.py   # AI 新闻摘要（基于新闻标题调用 LLM 生成当日总结）
 │   │   ├── proxy.py          # Guardian 反向代理（base 标签注入 + 白名单）
+│   │   ├── market_status.py  # 美股交易时段计算（美东/北京双时区 + 夏令时）
 │   │   ├── exchange_rate.py  # USD/CNY 汇率查询（open.er-api.com）
 │   │   ├── rag.py            # RAG v1（retrieve → generate）
 │   │   ├── rag_v2.py         # RAG v2（rewrite → judge → 条件路由）
@@ -250,6 +253,7 @@ lsof -ti:8000 | xargs kill 2>/dev/null; sleep 1
 | POST | `/api/guardian_news` | The Guardian 新闻爬取（无需参数） |
 | POST | `/api/news/summary` | AI 新闻摘要（body: `{headlines: [{title, link}, ...]}`） |
 | GET | `/api/proxy?url=...` | Guardian 反向代理（仅限 www.theguardian.com） |
+| GET | `/api/market/status` | 美股市场状态（双时区：美东/北京，自动夏令时） |
 | POST | `/api/auth/register` | 用户注册（body: `{username, password}`） |
 | POST | `/api/auth/login` | 用户登录（body: `{username, password}`） |
 | GET | `/api/auth/me` | 获取当前用户信息（需 Bearer Token） |
@@ -281,6 +285,7 @@ lsof -ti:8000 | xargs kill 2>/dev/null; sleep 1
     │                      ├──→ /api/guardian_news ──→ The Guardian
     │                      ├──→ /api/news/summary ──→ news_summary.py ──→ LLM（生成当日摘要）
     │                      ├──→ /api/proxy ──→ Guardian 反向代理
+    │                      ├──→ /api/market/status ──→ market_status.py（双时区 + 夏令时）
     │                      ├──→ /api/auth/* ──→ MySQL（用户注册/登录 + JWT）
     │                      ├──→ /api/portfolio/* ──→ MySQL + yfinance + 汇率API
     │                      │     ├─ transactions CRUD + summary（加权平均成本法）

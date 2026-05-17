@@ -182,6 +182,46 @@
     window.appState = state;
     window.reloadData = loadData;
 
+    // ---- 市场状态 ----
+    async function fetchMarketStatus() {
+        const el = document.getElementById("marketStatus");
+        if (!el) return;
+        try {
+            const res = await fetch("/api/market/status");
+            const data = await res.json();
+            renderMarketStatus(el, data);
+        } catch (e) {
+            console.warn("获取市场状态失败:", e);
+            el.querySelector(".status-label").textContent = "状态未知";
+            el.querySelector(".status-dot").className = "status-dot unknown";
+        }
+    }
+
+    function renderMarketStatus(el, data) {
+        const dot = el.querySelector(".status-dot");
+        const label = el.querySelector(".status-label");
+        const time = el.querySelector(".status-time");
+
+        // 根据状态设置圆点颜色
+        dot.className = "status-dot " + data.status;
+
+        // 状态标签
+        label.textContent = data.status_text;
+
+        // 时间信息：格式化为 tooltip + 简短文字
+        const nextLabel = data.next_event_label;
+        const nextTimeCn = data.next_event_time_cn;
+        const nextTimeEt = data.next_event_time_et;
+        time.textContent = `${nextLabel}: ${nextTimeCn}`;
+
+        // 详细 tooltip
+        el.title = `美东 ${data.current_et}\n北京 ${data.current_cn}\n\n${nextLabel}（美东）: ${nextTimeEt}\n${nextLabel}（北京）: ${nextTimeCn}`;
+    }
+
+    // 每 30 秒自动刷新市场状态
+    fetchMarketStatus();
+    setInterval(fetchMarketStatus, 30000);
+
     // 启动
     document.addEventListener("DOMContentLoaded", init);
 })();

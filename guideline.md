@@ -571,6 +571,69 @@ for article in soup.find_all("a", href=True):
             └─ 返回每只指数的 PositionSummary + 整体 PortfolioSummary
 ```
 
+### Pipeline I：市场状态指示器
+
+```
+用户打开主页（http://localhost:8000）
+    │
+    ├─ 1. app.js DOMContentLoaded 后立即调用 fetchMarketStatus()
+    │       GET /api/market/status（无需认证）
+    │       └─ 之后每 30 秒 setInterval 自动轮询刷新
+    │
+    ├─ 2. routers/market_status.py: GET /api/market/status
+    │       调用 services/market_status.py 的 get_market_status()
+    │
+    ├─ 3. services/market_status.py: get_market_status()
+    │       │
+    │       ├─ 获取 UTC 当前时间 → 转换为美东时间（ET）
+    │       │   └─ _et_offset(date): 计算给定日期的 UTC 偏移
+    │       │       ├─ 夏令时 EDT (3月第二个周日 ~ 11月第一个周日): UTC-4
+    │       │       └─ 冬令时 EST (其余时间): UTC-5
+    │       │
+    │       ├─ 判断交易时段（按美东时间）：
+    │       │   ├─ 周末（周六/日）→ status="closed", "周末休市"
+    │       │   ├─ 00:00~04:00   → status="closed", "已收盘"（等当天盘前）
+    │       │   ├─ 04:00~09:30   → status="pre_market", "盘前交易"
+    │       │   ├─ 09:30~16:00   → status="open", "开盘中"
+    │       │   ├─ 16:00~20:00   → status="after_hours", "盘后交易"
+    │       │   └─ 20:00~24:00   → status="closed", "已收盘"（等下一交易日）
+    │       │
+    │       ├─ 计算下次开盘/收盘时间（自动跳过周末）
+    │       │   └─ _next_trading_day(date): 跳过周六/日，返回下周一
+    │       │
+    │       └─ 双时区格式化：
+    │           ├─ _fmt_et(dt): → "2026-05-18 09:30 EDT"（自动标注 EDT/EST）
+    │           └─ _fmt_cn(dt): → "2026-05-18 21:30 CST"（UTC+8 固定偏移）
+    │
+    └─ 4. app.js: renderMarketStatus(el, data)
+            ├─ 状态指示圆点：绿色呼吸(开盘中) / 橙色(盘前/盘后) / 灰色(休市) / 红色(未知)
+            ├─ 状态标签文字：data.status_text（如"开盘中"）
+            ├─ 显示下一次事件时间（北京）：data.next_event_time_cn
+            └─ 鼠标悬停 tooltip：同时显示美东和北京双时区信息
+```
+
+**API 响应示例**：
+
+```json
+{
+  "status": "open",
+  "status_text": "开盘中",
+  "status_text_en": "Market Open",
+  "current_et": "2026-05-18 10:30 EDT",
+  "current_cn": "2026-05-18 22:30 CST",
+  "next_event": "close",
+  "next_event_time_et": "2026-05-18 16:00 EDT",
+  "next_event_time_cn": "2026-05-19 04:00 CST",
+  "next_event_label": "收盘",
+  "next_event_label_en": "Market Close"
+}
+```
+
+**自动刷新机制**：
+- 页面加载时立即请求一次
+- `setInterval(fetchMarketStatus, 30000)` 每 30 秒轮询
+- 无需用户手动刷新，状态实时更新
+
 ### 13. MySQL 数据库设计
 
 #### 13.1 数据库连接与配置

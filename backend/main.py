@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import STATIC_DIR, MYSQL_HOST
-from .routers import index_data, chat, prediction, guardian, proxy
+from .routers import index_data, chat, prediction, guardian, proxy, market_status
 from .routers import auth, portfolio
 
 
@@ -49,6 +49,7 @@ app.include_router(chat.router)
 app.include_router(prediction.router)
 app.include_router(guardian.router)
 app.include_router(proxy.router)
+app.include_router(market_status.router)
 app.include_router(auth.router)
 app.include_router(portfolio.router)
 
