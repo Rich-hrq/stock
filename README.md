@@ -194,6 +194,28 @@ all_proxy=http://127.0.0.1:7897 uvicorn backend.main:app --host 0.0.0.0 --port 8
 | 💼 持仓记录 | http://localhost:8000/portfolio.html |
 | 📖 API 文档 | http://localhost:8000/docs |
 
+### 🚢 可选：Nginx 反向代理部署
+
+如果要将服务部署到服务器供外网访问，推荐在 uvicorn 前加一层 Nginx：
+
+```bash
+# 1. 安装 Nginx
+sudo apt install nginx -y
+
+# 2. 一键配置（使用项目提供的脚本）
+sudo bash nginx_config/setup_nginx.sh
+
+# 3. 修改配置中的 server_name 为你的服务器 IP
+sudo sed -i 's/<your-server-ip>/你的IP/g' /etc/nginx/sites-available/stock
+
+# 4. 启动后端（仅监听 127.0.0.1，不对外暴露）
+uvicorn backend.main:app --host 127.0.0.1 --port 8000 &
+
+# 5. 访问 http://你的IP
+```
+
+> 📖 详细配置原理及排查指南见 [`nginx_config/GUIDE.md`](nginx_config/GUIDE.md)
+
 ---
 
 ## 📡 API 一览
@@ -346,6 +368,10 @@ stock_website/
 │   │   ├── test_rag.py           # RAG 版本对比测试
 │   │   └── chroma_db/            # 向量数据库持久化
 │   └── requirements.txt          # Python 依赖
+├── nginx_config/                 # Nginx 反向代理配置
+│   ├── nginx-stock.conf          # 站点配置模板
+│   ├── setup_nginx.sh            # 一键部署脚本
+│   └── GUIDE.md                  # Nginx 配置原理详解
 ├── README.md
 ├── guideline.md                  # 代码讲解 + 数据流说明
 └── DEBUG.md                      # 踩坑记录

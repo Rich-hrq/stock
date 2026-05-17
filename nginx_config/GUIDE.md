@@ -20,7 +20,7 @@
 
 **本项目场景**：
 ```
-远程浏览器 → http://10.208.141.191:80 → nginx → http://127.0.0.1:8000 (uvicorn)
+远程浏览器 → http://<your-server-ip>:80 → nginx → http://127.0.0.1:8000 (uvicorn)
                                           ↑
                                      反向代理层
 ```
@@ -91,7 +91,7 @@ sudo systemctl status nginx     # 查看运行状态
 ```nginx
 server {
     listen 80;
-    server_name 10.208.141.191;
+    server_name <your-server-ip>;
 
     access_log /var/log/nginx/stock-access.log;
     error_log  /var/log/nginx/stock-error.log;
@@ -112,7 +112,7 @@ server {
 |------|------|
 | `server { }` | 定义一个虚拟主机（站点）。一个 nginx 实例可以跑多个 server |
 | `listen 80` | 监听 80 端口（HTTP 默认端口） |
-| `server_name 10.208.141.191` | 匹配 Host 头为该 IP 的请求。用于区分同一端口上的多个站点 |
+| `server_name <your-server-ip>` | 匹配 Host 头为该 IP 的请求。用于区分同一端口上的多个站点 |
 | `access_log / error_log` | 分别记录正常访问和错误日志，按站点隔离方便排查 |
 | `location / { }` | 匹配所有以 `/` 开头的 URL。可写多个 location 做精细化路由 |
 | `proxy_pass http://127.0.0.1:8000` | **核心指令**：将匹配的请求转发到 `127.0.0.1:8000`（uvicorn） |
@@ -149,14 +149,14 @@ sudo systemctl reload nginx      # 热重载，不中断现有连接
 
 ```bash
 # 后端监听 127.0.0.1（不对外暴露）
-cd /home/rich/stock/stock
-conda activate stock
+cd ~/stock-turtle
+source .stock/bin/activate
 uvicorn backend.main:app --host 127.0.0.1 --port 8000
 
 # 另开终端验证
-curl http://10.208.141.191/api/health        # → {"status":"ok"}
-curl http://10.208.141.191/api/indices       # → 指数列表 JSON
-curl http://10.208.141.191/                  # → 前端首页 HTML
+curl http://<your-server-ip>/api/health        # → {"status":"ok"}
+curl http://<your-server-ip>/api/indices       # → 指数列表 JSON
+curl http://<your-server-ip>/                  # → 前端首页 HTML
 ```
 
 ---
@@ -164,22 +164,22 @@ curl http://10.208.141.191/                  # → 前端首页 HTML
 ## 四、请求流程（完整数据包路径）
 
 ```
-1. 远程浏览器输入 http://10.208.141.191/api/health
+1. 远程浏览器输入 http://<your-server-ip>/api/health
 
-2. DNS 解析或直接 IP → 网络层路由 → TCP 连接 10.208.141.191:80
+2. DNS 解析或直接 IP → 网络层路由 → TCP 连接 <your-server-ip>:80
 
 3. Nginx 收到 HTTP 请求：
    GET /api/health HTTP/1.1
-   Host: 10.208.141.191
+   Host: <your-server-ip>
 
 4. Nginx 匹配规则：
    - listen 80 ✓
-   - server_name 10.208.141.191 ✓
+   - server_name <your-server-ip> ✓
    - location /api/... ✅（匹配 / 前缀）
 
 5. Nginx 创建新请求发给后端：
    GET /api/health HTTP/1.1
-   Host: 10.208.141.191          ← 原始 Host（透传）
+   Host: <your-server-ip>          ← 原始 Host（透传）
    X-Real-IP: <客户端IP>          ← 真实 IP（Nginx 添加）
    X-Forwarded-For: <客户端IP>    ← 代理链（Nginx 添加）
 
@@ -198,11 +198,11 @@ curl http://10.208.141.191/                  # → 前端首页 HTML
 
 ### 5.1 静态文件 403 Forbidden
 
-**原因**：Nginx worker 以 `www-data` 用户运行，但项目目录 `/home/rich/` 权限为 750（禁止 other 访问），`www-data` 无法穿越进入项目目录读取文件。
+**原因**：Nginx worker 以 `www-data` 用户运行，但项目目录 `~/stock-turtle/` 权限为 750（禁止 other 访问），`www-data` 无法穿越进入项目目录读取文件。
 
 **解决方案**：
 - **方案 A**：去掉 Nginx 的静态文件 location，所有请求统一 proxy 到 uvicorn（本项目采用）
-- **方案 B**：`chmod o+x /home/rich` 给其他用户执行权限
+- **方案 B**：`chmod o+x ~/` 给其他用户执行权限
 - **方案 C**：将静态文件复制到 `/var/www/stock/static/`（标准做法）
 
 ### 5.2 修改配置后如何生效

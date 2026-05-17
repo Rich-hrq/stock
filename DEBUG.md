@@ -133,7 +133,7 @@ else:
 
 **现象**：nginx 配置了直接 serve 静态文件（CSS/JS/HTML），但浏览器访问返回 403
 
-**原因**：nginx worker 进程以 `www-data` 用户运行，而项目目录在 `/home/rich/stock/...` 下。Ubuntu 默认 `/home/rich` 权限为 750（`rwxr-x---`），`www-data` 无法穿越（无 execute 权限进入 `/home/rich`）
+**原因**：nginx worker 进程以 `www-data` 用户运行，而项目目录在 `/home/<user>/stock-turtle/...` 下。Ubuntu 默认 `/home/<user>` 权限为 750（`rwxr-x---`），`www-data` 无法穿越（无 execute 权限进入用户目录）
 
 **解决**：去掉 nginx 配置中的静态文件 `location` 块，所有请求统一反向代理到 uvicorn。静态文件优化对于此类小规模部署并非必要
 
@@ -171,7 +171,7 @@ proxy_set_header X-Forwarded-Proto $scheme;
 
 **解决**：
 ```bash
-cd /Users/hrq/Coding/stock/stock_website
+cd ~/stock-turtle
 .stock/bin/python -m uvicorn backend.main:app --reload --port 8000
 ```
 
@@ -287,7 +287,7 @@ min_price   = df["low"].min()         # 最低价 = 真实日内最低
 
 **解决**：始终使用 `.stock` 虚拟环境的 Python 启动服务器：
 ```bash
-/Users/hrq/Coding/stock/.stock/bin/python -m uvicorn backend.main:app --reload --port 8000
+~/.stock/bin/python -m uvicorn backend.main:app --reload --port 8000
 ```
 
 **验证**：启动后测试摘要接口：
