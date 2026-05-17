@@ -571,32 +571,202 @@ for article in soup.find_all("a", href=True):
             └─ 返回每只指数的 PositionSummary + 整体 PortfolioSummary
 ```
 
-### 13. MySQL + SQLAlchemy Async ORM
+### 13. MySQL 数据库设计
+
+#### 13.1 数据库连接与配置
+
+数据库配置通过 `backend/.env` 文件管理，`python-dotenv` 在应用启动时自动加载：
+
+```
+MYSQL_HOST=127.0.0.1
+MYSQL_USER=stock
+MYSQL_PASSWORD=12345abcde@stock
+MYSQL_DATABASE=stock
+```
+
+`backend/config.py` 读取环境变量并暴露为模块常量：
 
 ```python
-# database.py — 异步引擎 + 会话管理
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+MYSQL_HOST = os.environ.get("MYSQL_HOST", "")
+MYSQL_PORT = int(os.environ.get("MYSQL_PORT", "3306"))
+MYSQL_USER = os.environ.get("MYSQL_USER", "")
+MYSQL_PASSWORD = os.environ.get("MYSQL_PASSWORD", "")
+MYSQL_DATABASE = os.environ.get("MYSQL_DATABASE", "stock")
+```
+
+**条件启动**：`MYSQL_HOST` 为空时跳过数据库初始化，指数分析/RAG/新闻等功能不受影响。
+
+#### 13.2 数据表结构
+
+项目共有 **3 张表**，均通过 SQLAlchemy ORM 的 `Base.metadata.create_all` 自动创建（无手动 SQL 或 Alembic 迁移脚本）。
+
+##### 表 1：`users` — 用户表
+
+| 列名 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| `id` | `INT` | `PRIMARY KEY`, `AUTO_INCREMENT` | 用户唯一标识 |
+| `username` | `VARCHAR(20)` | `UNIQUE`, `NOT NULL` | 用户名 |
+| `password_hash` | `VARCHAR(128)` | `NOT NULL` | bcrypt 加密密码哈希 |
+| `created_at` | `DATETIME` | `DEFAULT NOW()` | 注册时间 |
+
+隐式索引：`username` 的 UNIQUE 约束自动创建唯一索引。
+
+##### 表 2：`investment_plans` — 定投计划表
+
+| 列名 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| `id` | `INT` | `PRIMARY KEY`, `AUTO_INCREMENT` | 计划唯一标识 |
+| `user_id` | `INT` | `FOREIGN KEY → users.id` | 所属用户 |
+| `symbol` | `VARCHAR(20)` | `NOT NULL` | 指数代码（如 ^GSPC） |
+| `amount_cny` | `DECIMAL(12, 2)` | `NOT NULL` | 每次买入金额（人民币） |
+| `frequency` | `VARCHAR(10)` | `NOT NULL` | 定投频率：`weekly` 或 `monthly` |
+| `day_of_week` | `INT` | `NULL` | 每周几（0=周一..6=周日），仅 weekly 时有效 |
+| `day_of_month` | `INT` | `NULL` | 每月几号（1-28），仅 monthly 时有效 |
+| `enabled` | `TINYINT(1)` | `DEFAULT 1` | 是否启用（True/False） |
+| `last_executed` | `DATE` | `NULL` | 上次执行日期，用于计算遗漏执行日 |
+| `created_at` | `DATETIME` | `DEFAULT NOW()` | 创建时间 |
+
+`frequency` 与 `day_of_*` 的互斥逻辑在后端路由层校验：
+- `weekly` → 必须提供 `day_of_week`（0~6）
+- `monthly` → 必须提供 `day_of_month`（1~28）
+
+##### 表 3：`transactions` — 交易记录表
+
+| 列名 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| `id` | `INT` | `PRIMARY KEY`, `AUTO_INCREMENT` | 交易唯一标识 |
+| `user_id` | `INT` | `FOREIGN KEY → users.id` | 所属用户 |
+| `symbol` | `VARCHAR(20)` | `NOT NULL` | 指数代码（如 ^GSPC） |
+| `direction` | `VARCHAR(4)` | `NOT NULL` | 方向：`buy` 或 `sell` |
+| `trade_date` | `DATE` | `NOT NULL` | 交易日期 |
+| `amount_cny` | `DECIMAL(12, 2)` | `NOT NULL` | 人民币金额（用户输入） |
+| `close_price_usd` | `DECIMAL(10, 2)` | `NOT NULL` | 当日收盘价，美元（yfinance 自动查询） |
+| `exchange_rate` | `DECIMAL(8, 4)` | `NOT NULL` | 当日 USD/CNY 汇率（open.er-api.com 自动查询） |
+| `usd_equivalent` | `DECIMAL(12, 2)` | `NOT NULL` | 美元等值 = amount_cny / exchange_rate（计算字段） |
+| `shares` | `DECIMAL(12, 6)` | `NOT NULL` | 持有份额 = usd_equivalent / close_price_usd（计算字段） |
+| `created_at` | `DATETIME` | `DEFAULT NOW()` | 记录创建时间 |
+
+**列的分工**：
+- 用户只需输入 `symbol`、`direction`、`trade_date`、`amount_cny`
+- `close_price_usd` 和 `exchange_rate` 由后端在创建交易时自动查询外部 API 获取
+- `usd_equivalent` 和 `shares` 由后端根据前两者自动计算
+- `created_at` 由数据库自动填充
+
+**外键关系**：
+```
+investment_plans.user_id ──→ users.id
+transactions.user_id     ──→ users.id
+```
+外键未设置 `ON DELETE CASCADE`，删除用户时若存在关联的交易或计划会触发外键错误。
+
+#### 13.3 SQLAlchemy ORM 模型定义
+
+所有模型定义在 `backend/models.py`，使用 SQLAlchemy 2.0 声明式映射（`Mapped` + `mapped_column`）：
+
+```python
+from sqlalchemy import ForeignKey, Numeric, String, func
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+class Base(DeclarativeBase):
+    """所有模型的基类。"""
+    pass
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(String(20), unique=True, comment="用户名")
+    password_hash: Mapped[str] = mapped_column(String(128), comment="bcrypt 加密密码")
+    created_at: Mapped[datetime] = mapped_column(default=func.now(), comment="注册时间")
+
+class InvestmentPlan(Base):
+    __tablename__ = "investment_plans"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), comment="所属用户")
+    symbol: Mapped[str] = mapped_column(String(20), comment="指数代码")
+    amount_cny: Mapped[Decimal] = mapped_column(Numeric(12, 2), comment="每次买入金额")
+    frequency: Mapped[str] = mapped_column(String(10), comment="weekly 或 monthly")
+    day_of_week: Mapped[int | None] = mapped_column(nullable=True, comment="每周几")
+    day_of_month: Mapped[int | None] = mapped_column(nullable=True, comment="每月几号")
+    enabled: Mapped[bool] = mapped_column(default=True, comment="是否启用")
+    last_executed: Mapped[date | None] = mapped_column(nullable=True, comment="上次执行日期")
+    created_at: Mapped[datetime] = mapped_column(default=func.now(), comment="创建时间")
+
+class Transaction(Base):
+    __tablename__ = "transactions"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), comment="所属用户")
+    symbol: Mapped[str] = mapped_column(String(20), comment="指数代码")
+    direction: Mapped[str] = mapped_column(String(4), comment="buy 或 sell")
+    trade_date: Mapped[date] = mapped_column(comment="交易日期")
+    amount_cny: Mapped[Decimal] = mapped_column(Numeric(12, 2), comment="人民币金额")
+    close_price_usd: Mapped[Decimal] = mapped_column(Numeric(10, 2), comment="当日收盘价")
+    exchange_rate: Mapped[Decimal] = mapped_column(Numeric(8, 4), comment="当日汇率")
+    usd_equivalent: Mapped[Decimal] = mapped_column(Numeric(12, 2), comment="美元等值")
+    shares: Mapped[Decimal] = mapped_column(Numeric(12, 6), comment="持有份额")
+    created_at: Mapped[datetime] = mapped_column(default=func.now(), comment="记录创建时间")
+```
+
+**类型映射关系**：
+
+| Python 类型 | SQLAlchemy 类型 | MySQL 列类型 |
+|------------|----------------|-------------|
+| `int` | `Integer` | `INT` |
+| `str` | `String(n)` | `VARCHAR(n)` |
+| `Decimal` | `Numeric(p, s)` | `DECIMAL(p, s)` |
+| `date` | `Date` | `DATE` |
+| `datetime` | `DateTime` | `DATETIME` |
+| `bool` | `Boolean` | `TINYINT(1)` |
+
+#### 13.4 异步引擎与会话管理
+
+`backend/database.py` 负责创建异步引擎、会话工厂和依赖注入：
+
+```python
 from urllib.parse import quote_plus
-from .config import MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 def _build_url() -> str:
-    user = quote_plus(MYSQL_USER)       # URL 编码，处理 @ 等特殊字符
+    """构建 MySQL 异步连接 URL，quote_plus 防止密码特殊字符破坏解析。"""
+    user = quote_plus(MYSQL_USER)
     password = quote_plus(MYSQL_PASSWORD)
     return f"mysql+aiomysql://{user}:{password}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}?charset=utf8mb4"
 
-engine = create_async_engine(_build_url(), pool_pre_ping=True, pool_size=5, max_overflow=10)
+engine = create_async_engine(
+    _build_url(),
+    echo=False,             # 不打印 SQL 日志
+    pool_pre_ping=True,     # 连接检出前 ping 测试，断连自动重连
+    pool_size=5,            # 常驻连接数
+    max_overflow=10,        # 峰值可额外创建的连接数
+)
+
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+async def init_db() -> None:
+    """启动时自动创建所有表（如已存在则跳过）。"""
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    """FastAPI 依赖注入：提供数据库会话，请求结束时自动关闭。"""
+    async with async_session() as session:
+        yield session
 ```
 
-关键注意点：
-- `create_async_engine` 创建异步引擎，`aiomysql` 是纯 Python 的 MySQL 异步驱动
-- `pool_pre_ping=True`：每次从连接池取出连接时先 ping，检测断连自动重连
+**关键设计点**：
+- `quote_plus` 对用户名/密码进行百分号编码，防止 `@` `/` `:` 等字符破坏连接串解析（实际踩过密码含 `@` 导致解析错误的坑）
+- `pool_pre_ping=True`：每次从连接池取出连接时先 ping，检测断连自动重连，适合 MySQL 默认 8 小时超时断开
 - `pool_size=5, max_overflow=10`：常规 5 连接 + 峰值可额外 10 连接
-- `get_session()` 作为 FastAPI `Depends` 使用，请求结束时自动关闭会话
-- `init_db()` 在 `main.py` 的 `lifespan` 启动事件中调用，自动执行 `CREATE TABLE IF NOT EXISTS`
-- ORM 模型定义在 `models.py`：`User`（用户表）和 `Transaction`（交易记录表），通过外键 `user_id` 关联
+- `expire_on_commit=False`：commit 后 ORM 对象不过期，可直接作为 Pydantic 响应返回
+- `get_session()` 作为 FastAPI `Depends` 使用：请求进入时创建会话，请求结束时 `async with` 上下文自动关闭并归还连接池
+- `init_db()` 在 `main.py` 的 `lifespan` 启动事件中调用，`create_all` 只创建不存在的表，不修改已有表结构（无迁移能力）
 
-**条件启动**：MySQL 模块仅在 `MYSQL_HOST` 非空时初始化，未配置时其他功能（指数分析/RAG/新闻）正常运行。
+**表创建机制**：`Base.metadata.create_all` 通过检查 MySQL `information_schema` 判断表是否存在，存在则跳过。这意味着：
+- 首次启动：自动建表
+- 后续启动：跳过（不会修改表结构）
+- 如需变更表结构，需手动执行 `ALTER TABLE` 或删除表后重建
 
 ### 14. JWT + bcrypt 认证
 
