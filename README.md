@@ -372,10 +372,27 @@ stock_website/
 │   ├── nginx-stock.conf          # 站点配置模板
 │   ├── setup_nginx.sh            # 一键部署脚本
 │   └── GUIDE.md                  # Nginx 配置原理详解
+├── FEATURES/                     # 功能设计档案（每功能一个 mini design doc）
+│   ├── stock-index-analysis.md   # 美股指数技术分析
+│   ├── rag-qa-system.md          # RAG 智能问答系统
+│   ├── prediction-market.md      # Polymarket 预测市场
+│   ├── guardian-news.md          # Guardian 新闻 + AI 摘要
+│   ├── nginx-reverse-proxy.md    # Nginx 反向代理部署
+│   ├── portfolio-tracking.md     # 持仓记录（用户系统+交易+P&L）
+│   ├── dca-investment-plans.md   # 定投计划
+│   ├── market-status-indicator.md # 市场状态指示器
+│   ├── multi-llm-support.md      # 多 LLM 兼容
+│   └── frontend-backend-separation.md # 前后端分离重构
 ├── README.md
 ├── guideline.md                  # 代码讲解 + 数据流说明
 └── DEBUG.md                      # 踩坑记录
 ```
+
+---
+
+## 📚 功能档案
+
+每个功能的完整设计文档存档于 [`FEATURES/`](FEATURES/) 目录，包含需求背景、数据结构、API 设计、边界条件与实现计划。适合了解功能的设计决策和约束。
 
 ---
 
