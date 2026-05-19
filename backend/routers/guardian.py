@@ -4,14 +4,14 @@ from fastapi import APIRouter, HTTPException
 
 from ..schemas import NewsSummaryRequest, NewsSummaryResponse
 from ..services.guardian_news import scrape_guardian_news as fetch_news
-from ..services.news_summary import generate_summary
+from ..services.news_summary import generate_summary_async
 
 router = APIRouter(prefix="/api", tags=["guardian_news"])
 
 
 @router.post("/guardian_news")
 async def get_news():
-    result = fetch_news()
+    result = await fetch_news()
     if result is None:
         raise HTTPException(status_code=502, detail="新闻爬取失败")
     return result
@@ -21,7 +21,7 @@ async def get_news():
 async def summarize_news(req: NewsSummaryRequest):
     if not req.headlines:
         raise HTTPException(status_code=400, detail="无新闻标题可供摘要")
-    summary = generate_summary(req.headlines)
+    summary = await generate_summary_async(req.headlines)
     return NewsSummaryResponse(
         summary=summary,
         generated_at=datetime.now().isoformat(),

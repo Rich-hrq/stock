@@ -9,7 +9,7 @@ router = APIRouter(prefix="/api", tags=["predict"])
 
 @router.post("/predict")
 async def get_prediction(req: PredictRequest):
-    result = fetch_polymarket_data(
+    result = await fetch_polymarket_data(
         keywords=req.keywords, limit=req.limit, threshold=req.threshold
     )
     if result is None:

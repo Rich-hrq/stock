@@ -1,12 +1,16 @@
 """RAG 对话 API 路由，处理用户对海龟交易法则的提问。使用 RAG v3 流水线。"""
 
+import asyncio
+
 from fastapi import APIRouter, HTTPException
 
 from ..schemas import ChatRequest, ChatResponse
-from ..services.rag_v3 import ask_question_v3
+from ..services.rag_v3 import ask_question_v3_async
 
 
 router = APIRouter(prefix="/api", tags=["chat"])
+
+_rag_semaphore = asyncio.Semaphore(3)
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -20,7 +24,8 @@ async def chat(req: ChatRequest):
         raise HTTPException(status_code=400, detail="消息不能为空")
 
     try:
-        result = ask_question_v3(req.message, req.history or [])
+        async with _rag_semaphore:
+            result = await ask_question_v3_async(req.message, req.history or [])
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"RAG 服务出错: {str(e)}")
 

@@ -11,6 +11,7 @@ v3 核心改进：
     4. 去掉 v2 的回环逻辑，减少延迟和 token 消耗
 """
 
+import asyncio
 from typing import TypedDict
 
 import chromadb
@@ -332,3 +333,8 @@ def ask_question_v3(question: str, history: list[dict] | None = None) -> dict:
         "search_queries": result["search_queries"],
         "num_queries": len(result["search_queries"]),
     }
+
+
+async def ask_question_v3_async(question: str, history: list[dict] | None = None) -> dict:
+    """ask_question_v3 的异步包装，在线程池中执行 RAG 流水线。"""
+    return await asyncio.to_thread(ask_question_v3, question, history)

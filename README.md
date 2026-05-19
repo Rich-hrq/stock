@@ -115,7 +115,7 @@
 | **数据库** | SQLAlchemy + aiomysql + MySQL | 异步 ORM + 用户/交易持久化 |
 | **认证** | JWT + bcrypt | Token 签发/验证 + 密码哈希 |
 | **前端图表** | ECharts | 走势线 / K线 / 布林带 / 唐奇安通道 |
-| **HTTP 客户端** | httpx | 异步汇率查询 |
+| **HTTP 客户端** | httpx (AsyncClient) | 全异步 HTTP（汇率、新闻、预测、代理） |
 
 ---
 
@@ -335,6 +335,8 @@ stock_website/
 │   ├── portfolio.html            # 持仓记录页（需登录）
 │   ├── css/                      # 页面样式
 │   └── js/                       # 页面逻辑 + ECharts 图表
+├── stress_test.py                 # API 并发压力测试脚本
+├── concurrency.md                 # 并发请求处理分析文档
 ├── backend/                      # FastAPI 后端
 │   ├── main.py                   # 应用入口
 │   ├── config.py                 # 全局配置
@@ -375,6 +377,7 @@ stock_website/
 ├── FEATURES/                     # 功能设计档案（每功能一个 mini design doc）
 │   ├── stock-index-analysis.md   # 美股指数技术分析
 │   ├── rag-qa-system.md          # RAG 智能问答系统
+│   ├── concurrency-improvements.md # 并发请求处理改进
 │   ├── prediction-market.md      # Polymarket 预测市场
 │   ├── guardian-news.md          # Guardian 新闻 + AI 摘要
 │   ├── nginx-reverse-proxy.md    # Nginx 反向代理部署
@@ -412,6 +415,24 @@ stock_website/
 python backend/knowledge/test_rag.py
 # 结果输出到 knowledge/test_results.json 和 test_results.md
 ```
+
+---
+
+## 🔬 并发测试
+
+项目已将所有阻塞调用（yfinance、requests、LLM、pandas）通过 `asyncio.to_thread()` 或 `httpx.AsyncClient` 移出事件循环，详见 [`concurrency.md`](concurrency.md)。
+
+运行压力测试：
+
+```bash
+# 默认 3 个并发级别 (5/10/20)，每级别每接口 15 次请求
+python stress_test.py
+
+# 自定义参数
+python stress_test.py --concurrency 5,10,20,30 --requests 30 --timeout 120
+```
+
+测试覆盖 6 个接口（排除 RAG），输出 min/max/avg/p50/p95/p99 延迟和吞吐量。
 
 ---
 

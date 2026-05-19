@@ -1,14 +1,14 @@
 """Guardian 页面代理 — 获取 HTML 并注入 <base> 标签使浏览器能加载子资源。"""
 
 from urllib.parse import urlparse
-import requests
+import httpx
 from ..config import HTTP_PROXY
 
 ALLOWED_DOMAIN = "www.theguardian.com"
 BASE_HREF = f'<base href="https://{ALLOWED_DOMAIN}">'
 
 
-def fetch_page(url: str, timeout: int = 15) -> str:
+async def fetch_page(url: str, timeout: int = 15) -> str:
     """获取 Guardian 页面 HTML。
 
     1. 域名白名单校验（仅放行 www.theguardian.com）
@@ -29,15 +29,15 @@ def fetch_page(url: str, timeout: int = 15) -> str:
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7",
     }
-    proxies = {"http": HTTP_PROXY, "https": HTTP_PROXY}
+    proxy = HTTP_PROXY if HTTP_PROXY else None
 
     try:
-        response = requests.get(url, headers=headers, proxies=proxies, timeout=timeout)
-        response.raise_for_status()
-    except requests.RequestException as e:
+        async with httpx.AsyncClient(proxy=proxy, timeout=timeout) as client:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            html = response.text
+    except httpx.HTTPError as e:
         raise RuntimeError(f"请求 Guardian 失败: {e}") from e
-
-    html = response.text
 
     # 注入 <base> 标签到 <head> 之后，使浏览器自动用 Guardian 域名解析相对路径
     if "<base " in html:

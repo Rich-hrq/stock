@@ -1,8 +1,8 @@
-import requests
+import httpx
 from ..config import HTTP_PROXY
 
 
-def fetch_polymarket_data(
+async def fetch_polymarket_data(
     keywords: list[str],
     limit: int = 500,
     threshold: int = 100000,
@@ -14,12 +14,13 @@ def fetch_polymarket_data(
         "closed": "false",
         "volume_min": threshold,
     }
-    proxies = {"http": HTTP_PROXY, "https": HTTP_PROXY}
+    proxy = HTTP_PROXY if HTTP_PROXY else None
 
     try:
-        response = requests.get(url, params=params, timeout=5, proxies=proxies)
+        async with httpx.AsyncClient(proxy=proxy, timeout=5) as client:
+            response = await client.get(url, params=params)
         response.raise_for_status()
-    except requests.exceptions.RequestException as e:
+    except httpx.HTTPError as e:
         print("Request failed：", e)
         return
 

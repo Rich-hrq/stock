@@ -1,5 +1,6 @@
 """美股指数数据获取服务，封装 yfinance 并添加缓存层。"""
 
+import asyncio
 import os
 from datetime import datetime, timedelta
 from functools import lru_cache
@@ -67,6 +68,16 @@ def fetch_index_data(
     if raw.index.tz is not None:
         raw.index = raw.index.tz_localize(None)
     return raw
+
+
+async def fetch_index_data_async(
+    symbol: str,
+    start_date: str,
+    end_date: str,
+    interval: str | None = None,
+) -> pd.DataFrame:
+    """fetch_index_data 的异步包装，在线程池中执行 yfinance 调用。"""
+    return await asyncio.to_thread(fetch_index_data, symbol, start_date, end_date, interval)
 
 
 @lru_cache(maxsize=32)

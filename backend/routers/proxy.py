@@ -18,7 +18,7 @@ async def proxy(url: str = Query(..., description="Guardian 文章 URL")):
         raise HTTPException(status_code=400, detail="缺少 url 参数")
 
     try:
-        html = fetch_page(url)
+        html = await fetch_page(url)
     except ValueError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except RuntimeError as e:

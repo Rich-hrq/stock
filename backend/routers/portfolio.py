@@ -21,7 +21,7 @@ from ..schemas import (
     TransactionOut,
 )
 from ..services.exchange_rate import get_exchange_rate
-from ..services.market_data import fetch_index_data, get_index_name
+from ..services.market_data import fetch_index_data_async, get_index_name
 
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
 
@@ -56,7 +56,7 @@ async def create_transaction(
     # 向前多取几天数据，确保非交易日也能拿到最近的收盘价
     start = (req.trade_date - timedelta(days=7)).strftime("%Y-%m-%d")
     end = (req.trade_date + timedelta(days=1)).strftime("%Y-%m-%d")
-    df = fetch_index_data(req.symbol, start, end, "1d")
+    df = await fetch_index_data_async(req.symbol, start, end, "1d")
     if df.empty:
         raise HTTPException(status_code=404, detail=f"{req.symbol} 在 {trade_date_str} 附近无数据")
 
@@ -177,7 +177,7 @@ async def get_summary(
         today = date.today()
         start = (today - timedelta(days=7)).strftime("%Y-%m-%d")
         end = (today + timedelta(days=1)).strftime("%Y-%m-%d")
-        df = fetch_index_data(symbol, start, end, "1d")
+        df = await fetch_index_data_async(symbol, start, end, "1d")
         if not df.empty:
             current_price = Decimal(str(round(float(df["close"].iloc[-1]), 2)))
         else:
@@ -262,7 +262,7 @@ async def _create_transaction_for_plan(
     trade_date_str = trade_date.strftime("%Y-%m-%d")
     start = (trade_date - timedelta(days=7)).strftime("%Y-%m-%d")
     end = (trade_date + timedelta(days=1)).strftime("%Y-%m-%d")
-    df = fetch_index_data(symbol, start, end, "1d")
+    df = await fetch_index_data_async(symbol, start, end, "1d")
     if df.empty:
         return None
 

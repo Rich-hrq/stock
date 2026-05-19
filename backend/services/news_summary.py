@@ -1,5 +1,6 @@
 """AI 新闻摘要服务 — 根据新闻标题列表调用 LLM 生成当日新闻总结。"""
 
+import asyncio
 from langchain_anthropic import ChatAnthropic
 from ..config import ANTHROPIC_API_KEY, ANTHROPIC_MODEL, ANTHROPIC_BASE_URL
 
@@ -68,3 +69,8 @@ def generate_summary(headlines: list[dict]) -> str:
     llm = _get_llm()
     response = llm.invoke(prompt)
     return _extract_answer(response)
+
+
+async def generate_summary_async(headlines: list[dict]) -> str:
+    """generate_summary 的异步包装，在线程池中执行 LLM 调用。"""
+    return await asyncio.to_thread(generate_summary, headlines)
