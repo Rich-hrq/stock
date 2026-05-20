@@ -3,6 +3,8 @@
     "use strict";
 
     var chartInstance = null;
+    var currentRecords = [];  // 缓存当前数据供 K 线形态分析使用
+    var clickHandlerBound = false;
 
     // 分组状态：price 始终开启不可切换
     var groupState = {
@@ -42,6 +44,19 @@
         }
         chartInstance = echarts.init(dom, "dark");
         window.addEventListener("resize", function () { chartInstance && chartInstance.resize(); });
+        // K 线点击事件（仅注册一次）
+        if (!clickHandlerBound) {
+            chartInstance.on("click", function (params) {
+                if (!groupState.candlestick) return;
+                if (params.seriesType !== "candlestick") return;
+                if (typeof analyzeCandlestick === "function" && currentRecords.length > 0) {
+                    var results = analyzeCandlestick(currentRecords, params.dataIndex);
+                    var dateStr = currentRecords[params.dataIndex]?.date?.slice(0, 10) || "";
+                    showCandlestickPopup(results, dateStr);
+                }
+            });
+            clickHandlerBound = true;
+        }
         return chartInstance;
     }
 
@@ -137,6 +152,7 @@
         if (!chart) return;
 
         var records = data.data || [];
+        currentRecords = records;  // 供 K 线形态分析使用
         if (records.length === 0) {
             cachedGroups = {};
             cachedBaseOption = null;

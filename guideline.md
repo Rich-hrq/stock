@@ -66,6 +66,49 @@
             渲染投资建议文案
 ```
 
+### Pipeline J：K线形态识别（点击触发）
+
+```
+用户激活「K线+量」切换按钮 → groupState.candlestick = true
+    │
+用户点击图表中某根 K 线柱
+    │
+    ├─ 1. ECharts click 事件（seriesType === "candlestick"）
+    │       charts.js 在 getChart() 中注册一次性 click handler
+    │       检查：groupState.candlestick 为 true 且 seriesType 为 candlestick
+    │
+    ├─ 2. candlestick.js: analyzeCandlestick(records, dataIndex)
+    │       │
+    │       ├─ console.log 输出诊断信息（OHLC/实体/波幅/趋势判断）
+    │       │
+    │       ├─ 单根形态检测（始终执行）：
+    │       │   ├─ detectHammer()        → 下跌趋势 + 小实体 + 长下影线
+    │       │   ├─ detectHangingMan()    → 上涨趋势 + 小实体 + 长下影线
+    │       │   └─ detectDoji()          → 实体≤15%波幅，4种变体分类
+    │       │
+    │       ├─ 多根形态检测（idx≥4 时执行）：
+    │       │   ├─ detectBullishEngulfing() / detectBearishEngulfing()
+    │       │   ├─ detectMorningStar() / detectEveningStar()
+    │       │   ├─ detectRisingThreeMethods() / detectFallingThreeMethods()
+    │       │   ├─ detectThreeBlackCrows() / detectThreeWhiteSoldiers()
+    │       │   └─ detectIslandReversal()        → 跳空缺口检测
+    │       │
+    │       └─ 按可靠性星级降序排序结果
+    │
+    └─ 3. candlestick.js: showCandlestickPopup(results, dateStr)
+            ├─ 无命中 → 显示「未检测到明显形态」提示
+            ├─ 有命中 → 逐条渲染形态卡片（名称/英文名/星级/分类/完整讲解）
+            └─ 关闭方式：✕按钮 / 关闭按钮 / 点击遮罩 / Esc 键
+```
+
+**检测辅助函数**：
+- `isDowntrend()` / `isUptrend()`：5 日 lookback，优先 MA20 斜率 → 收盘价斜率 → 首尾比较 fallback
+- `isSmallBody()` / `isBigBody()`：相对近 20 日平均实体判定
+- `bodyLen()` / `upperShadow()` / `lowerShadow()` / `totalRange()`：单根 K 线形态计算
+- `slope()`：跳过 null 值的简单线性回归斜率
+
+**讲解文案**：每种形态内置完整中文讲解（形态特征 / 原理 / 出现位置 / 可靠性评级 / 确认信号 / 止损建议 / 增强因素），来源于 12 种经典 K 线形态教材。```
+
 ### Pipeline B：RAG 对话
 
 ```

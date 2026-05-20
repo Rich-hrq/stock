@@ -26,6 +26,7 @@
 - **四大美股指数** — 标普500 / 纳斯达克100 / 纳斯达克综合 / 道琼斯
 - **多时间级别** — 从日内到年线，自由缩放
 - **5 种图表模式** — 走势线 / 均线(MA5/MA10/MA20) / K线+成交量 / 布林带 / 唐奇安通道
+- **K线形态识别** — 点击 K 线柱自动识别 12 种经典形态（锤子线/吞没/十字星/三白兵等），附带完整讲解
 - **海龟交易法则指标** — ATR/N值、布林带、唐奇安突破信号、趋势判断
 - **自动投资建议** — 基于趋势跟踪策略生成操作参考
 - **交易标记叠加** — 登录后在走势线上叠加买卖标记与金额
@@ -334,7 +335,7 @@ stock_website/
 │   ├── news.html                 # 新闻资讯页
 │   ├── portfolio.html            # 持仓记录页（需登录）
 │   ├── css/                      # 页面样式
-│   └── js/                       # 页面逻辑 + ECharts 图表
+│   └── js/                       # 页面逻辑 + ECharts 图表 + K线形态识别
 ├── stress_test.py                 # API 并发压力测试脚本
 ├── concurrency.md                 # 并发请求处理分析文档
 ├── backend/                      # FastAPI 后端
@@ -385,7 +386,8 @@ stock_website/
 │   ├── dca-investment-plans.md   # 定投计划
 │   ├── market-status-indicator.md # 市场状态指示器
 │   ├── multi-llm-support.md      # 多 LLM 兼容
-│   └── frontend-backend-separation.md # 前后端分离重构
+│   ├── frontend-backend-separation.md # 前后端分离重构
+│   └── candlestick-pattern-analysis.md # K线形态识别与分析
 ├── README.md
 ├── guideline.md                  # 代码讲解 + 数据流说明
 └── DEBUG.md                      # 踩坑记录
