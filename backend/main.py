@@ -5,8 +5,9 @@
     uvicorn backend.main:app --reload --port 8000
 """
 
+from pathlib import Path
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(dotenv_path=Path(__file__).parent / ".env")
 
 from contextlib import asynccontextmanager
 
@@ -56,8 +57,13 @@ app.include_router(portfolio.router)
 
 @app.get("/api/health")
 async def health():
-    """健康检查。"""
-    return {"status": "ok"}
+    """健康检查 + 前端可用的公开配置。"""
+    from .config import ANTHROPIC_MODEL, ANTHROPIC_BASE_URL
+    return {
+        "status": "ok",
+        "model": ANTHROPIC_MODEL,
+        "provider": "deepseek" if "deepseek" in ANTHROPIC_BASE_URL else "anthropic",
+    }
 
 
 # 静态文件托管（前端页面）

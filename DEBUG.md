@@ -299,6 +299,39 @@ curl -s -X POST http://localhost:8000/api/news/summary \
 
 ---
 
+## 新闻摘要 nginx 504 超时 — LLM 推理耗时超 60s
+
+**现象**：不同设备访问新闻资讯页，部分成功生成摘要，部分返回：
+```
+摘要生成失败：Unexpected token '<', "<html> <h"... is not valid JSON
+```
+nginx 错误日志：`upstream timed out (110: Connection timed out) while reading response header`
+
+**原因**：三层叠加 —
+1. nginx 默认 `proxy_read_timeout=60s`，LLM 推理（36 条标题 + `deepseek-v4-pro` + `max_tokens=4096`）耗时 **91 秒**
+2. `_get_llm()` 单例在 uvicorn auto-reload 后不更新参数，`default_request_timeout` 未生效
+3. 无并发控制，多设备同时访问时 DeepSeek API 可能限流触发重试风暴
+
+**解决**（2026-05-20）：
+1. **nginx**：`/api/news/summary` 单独设置 `proxy_read_timeout 120s`
+2. **后端 `news_summary.py`**：
+   - `_get_llm()` 移除单例守卫，每次重建实例确保参数最新
+   - `asyncio.wait_for(timeout=50)` 硬超时兜底
+   - `asyncio.Semaphore(2)` 限制并发 LLM 调用
+   - `MAX_HEADLINES=25` 截断标题列表
+   - `max_tokens` 从 4096 降至 2048，减少生成耗时
+   - 模型从 `deepseek-v4-pro` 切换为 `deepseek-v4-flash`（速度优先）
+   - 新增 `SummaryError` 错误分类（apikey / timeout / ratelimit / model / network）
+3. **前端 `news.js`**：
+   - 检查 `Content-Type` 再 `res.json()`，避免 HTML 解析报错
+   - `/api/health` 扩展返回模型名，页面加载时立即显示
+   - 新增红色诊断面板，展示具体错误原因和排查建议
+4. **`/api/health`** 扩展返回 `model` + `provider` 字段
+
+**验证**：36 条标题从 91s 降至 29.7s，摘要 563 字，模型 `deepseek-v4-flash`。
+
+---
+
 ## 前端静态文件被浏览器缓存，修改后页面无变化
 
 **现象**：修改 JS/CSS 文件后刷新页面，功能无变化。

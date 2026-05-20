@@ -272,7 +272,7 @@ uvicorn backend.main:app --host 127.0.0.1 --port 8000 &
 ### 系统
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| `GET` | `/api/health` | 健康检查 |
+| `GET` | `/api/health` | 健康检查 + 公开配置（模型名、提供商） |
 
 </details>
 
@@ -311,7 +311,7 @@ uvicorn backend.main:app --host 127.0.0.1 --port 8000 &
 |------|:--:|------|
 | `ANTHROPIC_AUTH_TOKEN` | ✅ | LLM API Key（也支持 `ANTHROPIC_API_KEY`） |
 | `ANTHROPIC_BASE_URL` | - | 自定义 API 端点（DeepSeek 等兼容服务） |
-| `ANTHROPIC_MODEL` | - | 模型名，默认 `claude-sonnet-4-6` |
+| `ANTHROPIC_MODEL` | - | 模型名，默认 `claude-sonnet-4-6`。新闻摘要推荐 `deepseek-v4-flash`（速度优先） |
 | `all_proxy` | ⭐ | HTTP 代理（国内访问外网需要） |
 | `MYSQL_HOST` | ✅ | MySQL 地址，为空时禁用持仓模块 |
 | `MYSQL_PORT` | - | MySQL 端口，默认 3306 |

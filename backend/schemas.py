@@ -44,6 +44,8 @@ class NewsSummaryResponse(BaseModel):
     """AI 新闻摘要响应"""
     summary: str
     generated_at: str
+    model: str = ""            # 当前使用的 LLM 模型名
+    error_reason: str = ""     # 错误分类: apikey / timeout / ratelimit / model / network / nginx_timeout / unknown
 
 
 # ---- 用户认证 ----

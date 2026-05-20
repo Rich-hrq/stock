@@ -454,36 +454,50 @@ if parsed.netloc != "www.theguardian.com":
 ### Pipeline G：AI 新闻摘要
 
 ```
-新闻列表渲染完成后，news.js 自动触发摘要生成
+页面加载 → /api/health（获取模型名并立即显示在摘要卡片头部）
+    │
+新闻列表渲染完成 → news.js 自动触发摘要生成
     │
     ├─ 1. news.js: fetchAISummary(items)
     │       POST /api/news/summary  { headlines: [{title, link}, ...] }
+    │       失败时先检查 Content-Type：HTML → 诊断 nginx 504，JSON → 解析 error_reason
     │
     ├─ 2. routers/guardian.py: summarize_news()
-    │       校验 headlines 非空，调用 generate_summary()
+    │       校验 headlines 非空
+    │       try: generate_summary_async() → 返回 {summary, model, error_reason: ""}
+    │       except SummaryError → 返回 {summary: "", model, error_reason: "apikey"/"timeout"/...}
     │
-    ├─ 3. services/news_summary.py: generate_summary()
+    ├─ 3. services/news_summary.py: 三层并发保护
     │       │
-    │       ├─ 从每条新闻的 link 中提取分类标签（如 [world], [business]）
-    │       ├─ 组装 Prompt：
-    │       │   ├─ 角色：专业的新闻编辑
-    │       │   ├─ 任务：根据标题总结当日主要新闻主题
-    │       │   ├─ 格式：【主题标题】主要内容（中文）
-    │       │   └─ 输入：带分类标签的标题列表
-    │       ├─ ChatAnthropic.invoke(prompt)
-    │       │   └─ 复用 config.py 中的模型配置（ANTHROPIC_MODEL / BASE_URL / API_KEY）
-    │       └─ _extract_answer(): 兼容 Anthropic 原生和 DeepSeek 两种响应格式
+    │       ├─ asyncio.Semaphore(2)        ← 第一层：最多 2 个并发 LLM 调用
+    │       ├─ asyncio.wait_for(50s)       ← 第二层：硬超时取消（nginx 120s 内有足够余量）
+    │       └─ asyncio.to_thread(...)      ← 第三层：LLM 阻塞调用移出事件循环
+    │              │
+    │              ├─ MAX_HEADLINES=25：只取前 25 条标题（控制 prompt 长度）
+    │              ├─ max_tokens=2048：减少生成耗时
+    │              ├─ max_retries=0：不自动重试，由 wait_for 统一控制
+    │              ├─ default_request_timeout=40s：单次 HTTP 请求超时
+    │              │
+    │              ├─ 提取分类标签 [world] / [business] → 组装 Prompt
+    │              ├─ ChatAnthropic.invoke(prompt)
+    │              │   └─ 每次调用重建实例（非单例），确保 model/api_key 最新
+    │              ├─ _extract_answer(): 过滤 thinking block，只取 text
+    │              └─ 异常 → _classify_and_raise() → SummaryError(apikey/timeout/ratelimit/model/network)
     │
-    └─ 4. news.js: formatSummary(summary)
-            ├─ 转义 HTML → 【主题】加粗 → 换行转 <br>
-            └─ 渲染到 aiSummaryBody 区域
+    └─ 4. news.js: 渲染结果
+            ├─ 成功：formatSummary(summary) → 渲染正文
+            ├─ 失败：红色诊断面板展示具体原因 + 排查建议
+            └─ 模型名始终可见（来自 /api/health，不依赖摘要接口）
 ```
 
 **设计要点**：
-- LLM 调用复用了 RAG 的 Anthropic 配置（`ANTHROPIC_MODEL`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_API_KEY`），无需额外配置
-- `_extract_answer()` 兼容了两种响应格式：标准 Anthropic（`response.content` 为 list[ContentBlock]）和 DeepSeek（`response.content` 为纯文本字符串）
-- 新闻分类标签从 URL 路径中提取（与前端逻辑一致），提升标题的上下文信息量
-- 摘要生成采用 `temperature=0.5`，在创造性与准确性之间取平衡
+- **并发控制**：`Semaphore(2)` 限制 LLM 并发，配合 `wait_for(50s)` 硬超时，防止线程池耗尽和 nginx 504
+- **模型选择**：推荐 `deepseek-v4-flash`（29s/36标题），不推荐 `deepseek-v4-pro`（91s/36标题）
+- **标题截断**：`MAX_HEADLINES=25` 平衡覆盖面与耗时
+- **错误分类**：`SummaryError` 将 LLM 异常归为 6 类（apikey/timeout/ratelimit/model/network/unknown），前端据此展示对应排查建议
+- **非单例 LLM**：`_get_llm()` 每次重建实例，确保 uvicorn auto-reload 后参数（模型名、API Key）始终最新
+- **thinking block 兼容**：DeepSeek V4 返回 `[{type: "thinking", thinking: ...}, {type: "text", text: ...}]`，`_extract_answer()` 通过 `block.get("text", "")` 自动过滤
+- **nginx 配合**：`/api/news/summary` 单独配置 `proxy_read_timeout 120s`，给 `wait_for(50s)` 留足余量
 
 ### 11. Polymarket 预测市场
 
