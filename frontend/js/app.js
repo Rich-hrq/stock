@@ -145,16 +145,14 @@
             if (typeof renderChart === "function") {
                 renderChart(data, markers);
             }
-            // 标记加载状态提示（页面可见 + 控制台）
+            // 标记加载状态提示（提示文字在 toggleGroup 中随按钮状态切换）
             const markerHintEl = document.getElementById("markerHint");
-            if (portfolioToken) {
-                if (markers.length > 0) {
-                    console.log(`[交易标记] 已渲染 ${markers.length} 个标记到走势线`);
-                    if (markerHintEl) markerHintEl.textContent = `✓ ${markers.length} 笔交易标记`;
-                } else {
-                    console.log("[交易标记] token 有效但当前范围无匹配交易");
-                    if (markerHintEl) markerHintEl.textContent = "当前范围无交易";
-                }
+            if (portfolioToken && markers.length > 0) {
+                console.log(`[交易标记] 已渲染 ${markers.length} 个标记`);
+                if (markerHintEl) markerHintEl.textContent = `✓ ${markers.length} 笔交易标记`;
+            } else if (portfolioToken) {
+                console.log("[交易标记] token 有效但当前范围无匹配交易");
+                if (markerHintEl) markerHintEl.textContent = "当前范围无交易";
             } else {
                 if (markerHintEl) markerHintEl.textContent = "";
             }

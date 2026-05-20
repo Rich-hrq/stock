@@ -13,6 +13,7 @@
         candlestick: false,
         bollinger: false,
         donchian: false,
+        positions: false,
     };
 
     // 各组的 series 定义缓存
@@ -32,6 +33,7 @@
         "布林下轨":     { type: "dash", color: "rgba(76,175,80,0.8)" },
         "唐奇安上轨(20)": { type: "dot",  color: "rgba(79,195,247,0.6)" },
         "唐奇安下轨(20)": { type: "dot",  color: "rgba(79,195,247,0.6)" },
+        "持仓标记":       { type: "dot",  color: "#4caf50" },
     };
 
     /** 初始化或获取 ECharts 实例 */
@@ -88,6 +90,7 @@
         if (group === "price") return;
         groupState[group] = !groupState[group];
         applyVisibility();
+        if (group === "positions") updateMarkerHint();
     }
 
     /** 更新按钮 active 样式 */
@@ -129,6 +132,14 @@
         });
 
         container.innerHTML = items.join("");
+    }
+
+    /** 随持仓标记切换显示/隐藏 markerHint */
+    function updateMarkerHint() {
+        var el = document.getElementById("markerHint");
+        if (!el) return;
+        var text = el.textContent;
+        el.style.display = (groupState.positions && text) ? "inline" : "none";
     }
 
     /** 绑定按钮点击事件 */
@@ -235,10 +246,6 @@
                 name: "走势线", type: "line", data: closeLine,
                 lineStyle: { color: "#e0e6ed", width: 1.5 }, symbol: "none",
                 xAxisIndex: 0, yAxisIndex: 0,
-                markPoint: markPointData.length > 0 ? {
-                    data: markPointData,
-                    animation: false,
-                } : undefined,
             },
         ];
 
@@ -292,6 +299,18 @@
             { name: "唐奇安下轨(20)", type: "line", data: dcLow20, lineStyle: { color: "rgba(79,195,247,0.5)", width: 1 }, symbol: "none", xAxisIndex: 0, yAxisIndex: 0 },
         ];
 
+        cachedGroups.positions = [
+            {
+                name: "持仓标记", type: "line", data: closeLine,
+                lineStyle: { opacity: 0 }, symbol: "none",
+                xAxisIndex: 0, yAxisIndex: 0,
+                markPoint: markPointData.length > 0 ? {
+                    data: markPointData,
+                    animation: false,
+                } : undefined,
+            },
+        ];
+
         // ---- 缓存基础配置 ----
         cachedBaseOption = {
             backgroundColor: "#0f1923",
@@ -313,7 +332,7 @@
                             html += "开:" + vals[1] + " 收:" + vals[2] + " 低:" + vals[3] + " 高:" + vals[4] + "<br/>";
                         } else if (name === "走势线") {
                             html += "收盘:" + p.data + "<br/>";
-                        } else if (name === "成交量") {
+                        } else if (name === "成交量" || name === "持仓标记") {
                             // 不显示在 tooltip
                         } else {
                             html += name + ":" + p.data + "<br/>";
