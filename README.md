@@ -94,7 +94,7 @@
    │              │      ├─ v2: rewrite → retrieve → judge → 条件路由
    │              │      └─ v3: evaluate → 选择性扩展 → 多查询融合 → generate
    │              │
-   │              ├── /api/predict ──── Polymarket API
+   │              ├── /api/predict /search ─── Polymarket API (搜索/列表)
    │              ├── /api/guardian_news ──── The Guardian
    │              ├── /api/news/summary ──── LLM (当日摘要)
    │              ├── /api/proxy ──── Guardian 反向代理
@@ -238,7 +238,8 @@ uvicorn backend.main:app --host 127.0.0.1 --port 8000 &
 ### 预测市场 & 新闻
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| `POST` | `/api/predict` | Polymarket 预测数据 |
+| `POST` | `/api/predict` | Polymarket 预测数据（列表模式） |
+| `POST` | `/api/predict/search` | Polymarket 全文搜索（搜索模式） |
 | `POST` | `/api/guardian_news` | Guardian 新闻爬取 |
 | `POST` | `/api/news/summary` | AI 新闻摘要 |
 | `GET` | `/api/proxy` | Guardian 反向代理 |

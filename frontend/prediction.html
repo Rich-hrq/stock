@@ -21,6 +21,10 @@
 
     <!-- 搜索栏 -->
     <div class="search-bar">
+        <div class="search-mode-toggle">
+            <button class="mode-btn active" id="modeSearch" title="全文搜索，与官网搜索一致">搜索模式</button>
+            <button class="mode-btn" id="modeList" title="遍历事件列表，本地关键字匹配">列表模式</button>
+        </div>
         <div class="search-input-wrap">
             <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="11" cy="11" r="8"/>
@@ -33,8 +37,8 @@
             <button id="searchPrediction">查询</button>
         </div>
         <div class="search-params">
-            <label>上限 <input type="number" id="predLimit" value="500" min="1" max="500"></label>
-            <label>最低交易量($) <input type="number" id="predThreshold" value="100000" min="0" step="10000"></label>
+            <label id="labelLimit">返回上限 <input type="number" id="predLimit" value="20" min="1" max="100"></label>
+            <label id="labelThreshold">最低交易量($) <input type="number" id="predThreshold" value="0" min="0" step="10000"></label>
         </div>
     </div>
 

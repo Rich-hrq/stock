@@ -70,6 +70,38 @@ body {
     gap: 12px;
 }
 
+/* 模式切换 */
+.search-mode-toggle {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.mode-btn {
+    padding: 6px 14px;
+    background: var(--bg-input);
+    color: var(--text-dim);
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s;
+}
+
+.mode-btn + .mode-btn {
+    border-left: 1px solid var(--border);
+}
+
+.mode-btn.active {
+    background: var(--accent);
+    color: var(--bg);
+    font-weight: 600;
+}
+
+.mode-btn:hover:not(.active) {
+    color: var(--text);
+}
+
 .search-input-wrap {
     flex: 1;
     min-width: 300px;

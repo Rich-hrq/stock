@@ -161,8 +161,34 @@
 
 ### Pipeline D：Polymarket 预测市场数据
 
+项目提供两种搜索模式，前端通过模式切换按钮选择：
+
+#### 搜索模式（默认，调用 `/public-search`）
+
 ```
-用户发送预测查询（POST /api/predict  { keywords, limit, threshold }）
+用户输入关键词 → POST /api/predict/search  { query, limit_per_type, threshold }
+    │
+    ├─ 1. routers/prediction.py: 接收请求，Pydantic 校验参数
+    │       PredictSearchRequest(query, limit_per_type, threshold)
+    │
+    ├─ 2. services/polymarket.py: search_polymarket_events()
+    │       │
+    │       ├─ 组装查询参数：q=query, limit_per_type
+    │       ├─ 通过代理请求 Polymarket 搜索 API
+    │       │     GET https://gamma-api.polymarket.com/public-search?q=...&limit_per_type=...
+    │       │
+    │       ├─ 从响应中取 data["events"] 列表
+    │       ├─ 本地过滤：跳过 volume < threshold 的 event
+    │       └─ extract(event) 格式化 → 返回 list[dict]
+    │
+    └─ 3. routers/prediction.py: 返回 JSON 给前端
+            如 API 请求失败 → 返回 502 + 错误详情
+```
+
+#### 列表模式（原有，调用 `/events`）
+
+```
+用户输入关键词 → POST /api/predict  { keywords, limit, threshold }
     │
     ├─ 1. routers/prediction.py: 接收请求，Pydantic 校验参数
     │       PredictRequest(keywords, limit, threshold)
@@ -170,7 +196,7 @@
     ├─ 2. services/polymarket.py: fetch_polymarket_data()
     │       │
     │       ├─ 组装查询参数：limit / active / closed / volume_min
-    │       ├─ 通过代理请求 Polymarket Gamma API
+    │       ├─ 通过代理请求 Polymarket 事件列表 API
     │       │     GET https://gamma-api.polymarket.com/events
     │       │
     │       ├─ 遍历返回的 events，对每个 event：
@@ -184,13 +210,29 @@
             如 API 请求失败 → 返回 502 + 错误详情
 ```
 
-**Polymarket API 说明**：
-- Gamma API (`gamma-api.polymarket.com`) 是 Polymarket 的公开数据接口，无需 API Key
-- `active=true&closed=false`：只取活跃中的事件
-- `volume_min`：过滤低交易量事件（单位：美元）
-- 返回的 `markets[].outcomePrices` 是 JSON 字符串数组，需前端自行解析
+#### 两种模式对比
 
-**关键词过滤逻辑** (`check_relevant`)：
+| 维度 | 搜索模式 | 列表模式 |
+|------|---------|---------|
+| **API 端点** | `GET /public-search?q=...` | `GET /events?active=true&closed=false&volume_min=...` |
+| **前端路由** | `POST /api/predict/search` | `POST /api/predict` |
+| **关键词过滤** | 服务端全文搜索引擎匹配（与官网搜索一致） | 本地 `check_relevant()` 大小写不敏感包含匹配 |
+| **volume 过滤** | 搜索后本地过滤（API 不支持 `volume_min`） | API 端 `volume_min` 参数直接过滤 |
+| **返回上限** | `limit_per_type`（默认 20） | `limit`（传入 500，API 实际限制 100） |
+| **数据获取方式** | 精准搜索，直接返回匹配项 | 遍历全量列表，客户端筛选 |
+| **优势** | 快速精准，可搜到官方搜索引擎索引到的所有事件 | 无搜索 API 依赖，可获取较完整的活跃事件 |
+| **劣势** | 不支持 `volume_min` 服务端过滤 | 默认排序不在前 100 的事件会被遗漏；需自己分页 |
+
+**实际案例**：搜索 `"iran"` 查找 `"US x Iran permanent peace deal by...?"`（volume 1.28 亿）
+- 搜索模式：`GET /public-search?q=iran` → 直接命中 ✅
+- 列表模式：`GET /events?limit=500&volume_min=100000` → 服务端只返回前 100 条，且默认排序（非 volume）下该事件排不进前 100 ❌
+
+**Polymarket API 通用说明**：
+- Gamma API (`gamma-api.polymarket.com`) 是 Polymarket 的公开数据接口，无需 API Key
+- 返回的 `markets[].outcomePrices` 是 JSON 字符串数组，需前端自行解析
+- 国内访问需设置代理，与 yfinance 共用 `HTTP_PROXY` 配置
+
+**关键词过滤逻辑** (`check_relevant`，仅列表模式)：
 ```python
 # 大小写不敏感的包含匹配
 # 只要 context（标题+描述+元数据）中包含任意一个 keyword，即返回 True
@@ -241,9 +283,16 @@ class ChatResponse(BaseModel):
     avg_distance: float | None = None        # 检索结果的平均向量距离
 
 class PredictRequest(BaseModel):
+    """预测市场查询请求（列表模式）"""
     keywords: list[str] = ["nasdaq", "s&p500", ...]
     limit: int = 500
     threshold: int = 100000
+
+class PredictSearchRequest(BaseModel):
+    """预测市场查询请求（搜索模式）"""
+    query: str                           # 搜索关键字，空格分隔多个词
+    limit_per_type: int = 20             # 每种实体类型返回上限
+    threshold: int = 0                   # 成交量下限（本地过滤）
 
 class NewsSummaryRequest(BaseModel):
     headlines: list[dict]  # [{title, link}, ...]
@@ -544,13 +593,37 @@ if parsed.netloc != "www.theguardian.com":
 
 ### 11. Polymarket 预测市场
 
+项目提供两种搜索模式，通过前端模式切换按钮切换：
+
+**搜索模式**（默认）— 调用 `GET /public-search` 端点：
 ```python
-# Gamma API 是 Polymarket 的公开数据接口，无需 API Key
+# 全文搜索引擎，与 Polymarket 官网搜索一致
+url = "https://gamma-api.polymarket.com/public-search"
+params = {"q": "iran peace", "limit_per_type": 20}
+response = requests.get(url, params=params, proxies={"http": proxy, "https": proxy})
+data = response.json()
+events = data["events"]  # 搜索结果自动按相关性排序
+```
+
+**列表模式**（原有）— 调用 `GET /events` 端点：
+```python
+# 遍历事件列表，本地做关键词匹配
 url = "https://gamma-api.polymarket.com/events"
 params = {"limit": 500, "active": "true", "closed": "false", "volume_min": 100000}
 response = requests.get(url, params=params, proxies={"http": proxy, "https": proxy})
+# 对每个 event 做 check_relevant() 本地关键词过滤
 ```
 
+两种模式的关键差异：
+| 维度 | 搜索模式 | 列表模式 |
+|------|---------|---------|
+| API | `/public-search` | `/events` |
+| 过滤 | API 端全文搜索 | 本地 `check_relevant()` |
+| volume | 搜索后本地过滤 | API 端 `volume_min` |
+| 结果上限 | `limit_per_type` | API 实际限制 100 条 |
+| 适用 | 精准关键词搜索 | 全量浏览 |
+
+- Gamma API (`gamma-api.polymarket.com`) 是 Polymarket 的公开数据接口，无需 API Key
 - 每个事件包含多个子市场（markets），每个市场有不同的到期日和赔率
 - `outcomePrices` 是 JSON 字符串（如 `["0.12", "0.88"]`），表示各结果当前隐含概率
 - `volume` 是美元计价的累计交易量，用于判断市场活跃度

@@ -12,11 +12,31 @@
     const prevBtn = document.getElementById("prevMarket");
     const nextBtn = document.getElementById("nextMarket");
     const pageIndicator = document.getElementById("pageIndicator");
+    const modeSearch = document.getElementById("modeSearch");
+    const modeList = document.getElementById("modeList");
 
     let events = [];          // 按 event 分组（不再扁平化）
     let keywords = [];        // 当前搜索词，用于高亮
     let currentIdx = 0;
     let isSearching = false;
+    let searchMode = true;    // true = 搜索模式, false = 列表模式
+
+    // ---- 模式切换 ----
+    function setMode(isSearch) {
+        searchMode = isSearch;
+        modeSearch.classList.toggle("active", isSearch);
+        modeList.classList.toggle("active", !isSearch);
+        if (isSearch) {
+            limitInput.value = 20;
+            thresholdInput.value = 0;
+        } else {
+            limitInput.value = 500;
+            thresholdInput.value = 100000;
+        }
+    }
+
+    modeSearch.addEventListener("click", () => setMode(true));
+    modeList.addEventListener("click", () => setMode(false));
 
     // ---- 事件绑定 ----
     searchBtn.addEventListener("click", search);
@@ -45,15 +65,30 @@
         cardArea.style.display = "none";
 
         try {
-            const res = await fetch("/api/predict", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    keywords,
-                    limit: parseInt(limitInput.value) || 500,
-                    threshold: parseInt(thresholdInput.value) || 0,
-                }),
-            });
+            let res;
+            if (searchMode) {
+                // 搜索模式：调用 /public-search 端点
+                res = await fetch("/api/predict/search", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        query: keywords.join(" "),
+                        limit_per_type: parseInt(limitInput.value) || 20,
+                        threshold: parseInt(thresholdInput.value) || 0,
+                    }),
+                });
+            } else {
+                // 列表模式：调用原接口
+                res = await fetch("/api/predict", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        keywords,
+                        limit: parseInt(limitInput.value) || 500,
+                        threshold: parseInt(thresholdInput.value) || 0,
+                    }),
+                });
+            }
 
             if (!res.ok) {
                 const err = await res.json();

@@ -27,10 +27,17 @@ class ChatResponse(BaseModel):
 # ---- 预测市场 (prediction.py) ----
 
 class PredictRequest(BaseModel):
-    """Polymarket 预测市场查询请求"""
+    """Polymarket 预测市场查询请求（列表模式）"""
     keywords: list[str] = ["nasdaq", "^ndx", "s&p500", "dow jones"]
     limit: int = 500
     threshold: int = 100000
+
+
+class PredictSearchRequest(BaseModel):
+    """Polymarket 预测市场搜索请求（搜索模式）"""
+    query: str
+    limit_per_type: int = 20
+    threshold: int = 0
 
 
 # ---- 新闻摘要 (guardian.py) ----

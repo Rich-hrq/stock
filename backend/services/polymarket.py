@@ -1,13 +1,61 @@
 import httpx
 from ..config import HTTP_PROXY
 
+SEARCH_URL = "https://gamma-api.polymarket.com/public-search"
+EVENTS_URL = "https://gamma-api.polymarket.com/events"
+
+
+async def search_polymarket_events(
+    query: str,
+    limit_per_type: int = 20,
+    threshold: int = 0,
+) -> list[dict] | None:
+    """通过 Polymarket 搜索 API 查询事件。
+
+    调用 /public-search 端点，支持全文搜索，与官网搜索一致。
+
+    Args:
+        query: 搜索关键字（空格分隔多个词）。
+        limit_per_type: 每种实体类型（events/markets/profiles）返回数量上限。
+        threshold: 成交量下限，搜索结果中 volume 低于此值的 event 会被过滤。
+
+    Returns:
+        匹配的事件列表，失败时返回 None。
+    """
+    params: dict = {
+        "q": query,
+        "limit_per_type": limit_per_type,
+    }
+    proxy = HTTP_PROXY if HTTP_PROXY else None
+
+    try:
+        async with httpx.AsyncClient(proxy=proxy, timeout=10) as client:
+            response = await client.get(SEARCH_URL, params=params)
+        response.raise_for_status()
+    except httpx.HTTPError as e:
+        print("Search request failed:", e)
+        return None
+
+    data = response.json()
+    events = data.get("events", [])
+
+    extracted_events = []
+    for event in events:
+        if threshold > 0:
+            vol = event.get("volume", 0) or 0
+            if vol < threshold:
+                continue
+        extracted_events.append(extract(event))
+
+    return extracted_events
+
 
 async def fetch_polymarket_data(
     keywords: list[str],
     limit: int = 500,
     threshold: int = 100000,
 ) -> list[dict] | None:
-    url = "https://gamma-api.polymarket.com/events"
+    url = EVENTS_URL
     params = {
         "limit": limit,
         "active": "true",
