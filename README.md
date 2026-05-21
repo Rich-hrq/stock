@@ -187,17 +187,67 @@ all_proxy=http://127.0.0.1:7897 uvicorn backend.main:app --host 0.0.0.0 --port 8
 
 ### 7. 打开浏览器
 
-| 页面 | 地址 |
-|------|------|
-| 🏠 主页 | http://localhost:8000 |
-| 📈 预测市场 | http://localhost:8000/prediction.html |
-| 📰 新闻资讯 | http://localhost:8000/news.html |
-| 💼 持仓记录 | http://localhost:8000/portfolio.html |
-| 📖 API 文档 | http://localhost:8000/docs |
+| 页面 | 本地地址 | 公网地址 |
+|------|---------|---------|
+| 🏠 主页 | http://localhost:8000 | https://stock.richhrq.xyz |
+| 📈 预测市场 | http://localhost:8000/prediction.html | https://stock.richhrq.xyz/prediction.html |
+| 📰 新闻资讯 | http://localhost:8000/news.html | https://stock.richhrq.xyz/news.html |
+| 💼 持仓记录 | http://localhost:8000/portfolio.html | https://stock.richhrq.xyz/portfolio.html |
+| 📖 API 文档 | http://localhost:8000/docs | https://stock.richhrq.xyz/docs |
 
-### 🚢 可选：Nginx 反向代理部署
+### 🚢 部署到公网
 
-如果要将服务部署到服务器供外网访问，推荐在 uvicorn 前加一层 Nginx：
+项目已通过 **Cloudflare Tunnel + Nginx** 部署在 `stock.richhrq.xyz`，无公网 IP 的情况下也能实现公网 HTTPS 访问。
+
+<details>
+<summary><b>方案 A：Cloudflare Tunnel（无公网 IP，推荐）</b></summary>
+
+利用 Cloudflare Zero Trust 建立安全隧道，无需公网 IP、无需路由器端口转发，自动获得 HTTPS 证书。
+
+**架构**：
+```
+浏览器 ──→ Cloudflare CDN ──→ cloudflared ──→ nginx:80 ──→ uvicorn:8000
+  ↑           (HTTPS)            (隧道)        (反向代理)      (应用)
+```
+
+1. **前提**：拥有一个域名，并将其 Nameserver 托管到 Cloudflare
+2. **安装 cloudflared**：
+   ```bash
+   curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared
+   sudo install -m 755 cloudflared /usr/local/bin/
+   ```
+3. **创建隧道**（替换 `<uuid>` 和 `<domain>`）：
+   ```bash
+   cloudflared tunnel login     # 浏览器授权域名
+   cloudflared tunnel create <tunnel-name>
+   ```
+4. **编写配置** `~/.cloudflared/config.yml`：
+   ```yaml
+   tunnel: <tunnel-uuid>
+   credentials-file: /home/<user>/.cloudflared/<uuid>.json
+
+   ingress:
+     - hostname: <your-domain>
+       service: http://localhost:80
+     - service: http_status:404
+   ```
+5. **配置 DNS**：在 Cloudflare Dashboard → Zero Trust → Tunnels 中，将 `<your-domain>` 的 CNAME 指向 ` <tunnel-uuid>.cfargotunnel.com`
+6. **运行**：
+   ```bash
+   cloudflared tunnel --config ~/.cloudflared/config.yml run
+   ```
+7. **(可选) 设为系统服务**：
+   ```bash
+   sudo cloudflared service install
+   ```
+
+完整流程及原理详解见 [`guideline.md`](guideline.md)。
+</details>
+
+<details>
+<summary><b>方案 B：有公网 IP — Nginx 反向代理</b></summary>
+
+如果有公网 IP（VPS 或固定 IP 宽带），可直接用 Nginx 对外服务：
 
 ```bash
 # 1. 安装 Nginx
@@ -206,16 +256,21 @@ sudo apt install nginx -y
 # 2. 一键配置（使用项目提供的脚本）
 sudo bash nginx_config/setup_nginx.sh
 
-# 3. 修改配置中的 server_name 为你的服务器 IP
-sudo sed -i 's/<your-server-ip>/你的IP/g' /etc/nginx/sites-available/stock
+# 3. 修改配置中的 server_name 为你的域名或 IP
+sudo sed -i 's/<your-server-ip>/你的域名/g' /etc/nginx/sites-available/stock
 
-# 4. 启动后端（仅监听 127.0.0.1，不对外暴露）
+# 4. 如需 HTTPS，推荐用 Certbot 自动获取 Let's Encrypt 证书
+sudo apt install certbot python3-certbot-nginx -y
+sudo certbot --nginx -d <your-domain>
+
+# 5. 启动后端（仅监听 127.0.0.1，不对外暴露）
 uvicorn backend.main:app --host 127.0.0.1 --port 8000 &
 
-# 5. 访问 http://你的IP
+# 6. 访问 http://你的域名 或 https://你的域名
 ```
 
 > 📖 详细配置原理及排查指南见 [`nginx_config/GUIDE.md`](nginx_config/GUIDE.md)
+</details>
 
 ---
 

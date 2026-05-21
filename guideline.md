@@ -985,3 +985,203 @@ def create_token(user_id: int) -> str:
 - **`get_current_user()`**：FastAPI `Depends`，从 `Authorization: Bearer <token>` 头解析 JWT → 查数据库 → 返回 User 对象
 - **Token 7 天过期**：平衡安全性与用户体验，过期后需重新登录
 - **`python-dotenv`**：在 `main.py` 启动时加载 `backend/.env`，避免每次手动设置环境变量
+
+---
+
+## 三、公网部署
+
+将本地服务发布到公网有两种方式：**Cloudflare Tunnel**（无需公网 IP）和 **Nginx 直连**（需公网 IP）。本项目实际部署在 `stock.richhrq.xyz`，采用方案 A。
+
+### Pipeline K：Cloudflare Tunnel 公网访问（无公网 IP）
+
+这是本项目实际使用的部署方式。利用 Cloudflare Zero Trust 建立安全隧道，家宽/内网服务器无需公网 IP 即可被公网访问，同时自动获得 HTTPS 证书和 CDN 加速。
+
+**完整架构**：
+
+```
+                                        局域网 (无公网 IP)
+┌──────────┐    ┌──────────────┐    ┌──────────────────────────────┐
+│  浏览器    │    │  Cloudflare  │    │  cloudflared    nginx     uvicorn│
+│           │───→│  CDN/Edge    │───→│  (隧道客户端) ──→ :80 ──→ :8000  │
+│ stock...  │    │  (HTTPS)     │    │                              │
+│  .xyz     │    │              │    │  服务器/树莓派/家庭电脑         │
+└──────────┘    └──────────────┘    └──────────────────────────────┘
+     ↑                ↑                        ↑
+  DNS 解析        自动 SSL                  出站连接到
+  (CNAME →      (Edge Cert)              Cloudflare
+  tunnel)                                (无需入站端口)
+```
+
+**请求全链路**：
+
+```
+1. 用户在浏览器输入 https://stock.richhrq.xyz/api/health
+
+2. DNS 解析
+   stock.richhrq.xyz → CNAME → <tunnel-id>.cfargotunnel.com → Cloudflare Edge
+
+3. Cloudflare Edge
+   ├─ SSL 终结（自动签发 Edge Certificate）
+   ├─ CDN 缓存静态资源（可选）
+   └─ 将请求通过 QUIC 隧道转发给 cloudflared
+
+4. cloudflared（运行在本地服务器）
+   ├─ 出站连接到 Cloudflare（只需 443 出站，无需开放入站端口）
+   ├─ 收到隧道内的 HTTP 请求
+   └─ 按 ingress 配置转发：hostname 匹配 → 转发到 http://localhost:80
+
+5. Nginx (:80)
+   ├─ 收到 cloudflared 转发来的请求
+   ├─ proxy_pass http://127.0.0.1:8000
+   └─ 添加 X-Real-IP / X-Forwarded-For 等头
+
+6. uvicorn (:8000)
+   ├─ 处理业务逻辑
+   └─ 返回响应
+
+7. 响应原路返回：uvicorn → nginx → cloudflared → Cloudflare → 浏览器
+   （浏览器看到的是 HTTPS 加密的响应）
+```
+
+**关键设计点**：
+
+| 环节 | 说明 |
+|------|------|
+| **隧道方向** | cloudflared **主动出站**连接 Cloudflare，不需要路由器端口转发、不需要公网 IP |
+| **SSL 终结** | Cloudflare Edge 自动处理 HTTPS，本地 nginx 不需要配证书 |
+| **防火墙友好** | cloudflared 只发起到 `*.argotunnel.com` 的 443 出站连接，无需开放任何入站端口 |
+| **CDN 加速** | 静态资源（CSS/JS/图片）可由 Cloudflare CDN 缓存，减少回源流量 |
+| **DDoS 防护** | Cloudflare 自带基础 DDoS 防护，攻击流量在 Edge 层面过滤 |
+| **零信任** | 可配合 Cloudflare Access 添加身份验证（如 OTP / GitHub 登录），在到达应用前拦截未授权用户 |
+
+**对比：有公网 IP 的部署方式**：
+
+```
+┌──────────┐    ┌──────────────────────────┐
+│  浏览器    │───→│  公网 IP 服务器            │
+│           │    │  nginx (:80/:443)        │
+│           │    │    └─→ uvicorn (:8000)   │
+└──────────┘    └──────────────────────────┘
+```
+
+| 维度 | Cloudflare Tunnel | 有公网 IP + Nginx |
+|------|------------------|-------------------|
+| **公网 IP** | 不需要 | 需要（VPS 或固定 IP 宽带） |
+| **入站端口** | 0 个（纯出站连接） | 80/443 需对外开放 |
+| **HTTPS 证书** | Cloudflare 自动签发 | 需手动配置 Let's Encrypt（certbot） |
+| **DDoS 防护** | 自带 | 需自行配置 fail2ban / WAF |
+| **延迟** | 多一跳（经过 Cloudflare Edge） | 直连，理论上更低 |
+| **费用** | 免费（Cloudflare Free Plan） | 服务器/VPS 费用 |
+| **适用场景** | 家庭宽带、内网服务器、树莓派 | VPS、云服务器、IDC 托管 |
+
+**Cloudflared 操作步骤**：
+
+#### 步骤 1：安装 cloudflared
+
+```bash
+# Linux (amd64)
+curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared
+sudo install -m 755 cloudflared /usr/local/bin/
+cloudflared --version
+```
+
+#### 步骤 2：登录并授权域名
+
+```bash
+cloudflared tunnel login
+# 弹出浏览器 → 选择要授权的 Cloudflare 域名 → 授权完成
+# 证书保存在 ~/.cloudflared/cert.pem
+```
+
+这一步将你的机器与 Cloudflare 账号关联，获得管理该域名下 Tunnel 的权限。
+
+#### 步骤 3：创建隧道
+
+```bash
+cloudflared tunnel create <tunnel-name>
+# 输出示例：
+# Created tunnel <tunnel-name> with id <tunnel-uuid>
+# 凭证文件自动保存到 ~/.cloudflared/<uuid>.json
+```
+
+每个 tunnel 有唯一 UUID，凭证 JSON 文件用于后续认证。**不要提交到 git 或公开该文件。**
+
+#### 步骤 4：编写 ingress 配置
+
+创建 `~/.cloudflared/config.yml`：
+
+```yaml
+tunnel: <tunnel-uuid>                             # 步骤 3 返回的 UUID
+credentials-file: /home/<user>/.cloudflared/<uuid>.json
+
+ingress:
+  - hostname: <your-domain>                       # 你的自定义域名
+    service: http://localhost:80                  # 本地 nginx 地址
+  - service: http_status:404                      # 兜底：其他域名一律 404
+```
+
+`ingress` 规则从上到下匹配，最后一条 `http_status:404` 作为默认规则，防止被未授权域名访问。
+
+#### 步骤 5：配置 DNS
+
+在 Cloudflare Dashboard → Zero Trust → Networks → Tunnels 中：
+- 点击刚创建的 Tunnel → Configure → Public Hostname
+- 添加：`<your-domain>` → Service Type: HTTP → URL: `localhost:80`
+
+或者手动在 DNS 中添加 CNAME 记录：
+```
+类型: CNAME
+名称: stock (或你的子域名)
+目标: <tunnel-uuid>.cfargotunnel.com
+```
+
+#### 步骤 6：启动隧道
+
+```bash
+# 前台运行（调试用，Ctrl+C 停止）
+cloudflared tunnel --config ~/.cloudflared/config.yml run
+
+# 后台运行
+nohup cloudflared tunnel --config ~/.cloudflared/config.yml run > /tmp/cloudflared.log 2>&1 &
+
+# 安装为系统服务（推荐，开机自启）
+sudo cloudflared service install
+sudo systemctl enable cloudflared --now
+systemctl status cloudflared
+```
+
+#### 步骤 7：验证
+
+```bash
+# 从外部网络访问
+curl https://<your-domain>/api/health
+# → {"status":"ok"}
+
+# 查看隧道状态
+cloudflared tunnel info <tunnel-name>
+```
+
+**完整启动链**（本项目实际运行方式）：
+
+```bash
+# 1. 启动 uvicorn（监听 127.0.0.1:8000）
+cd ~/stock/stock && source .stock/bin/activate
+uvicorn backend.main:app --host 127.0.0.1 --port 8000 &
+
+# 2. 启动 nginx（监听 0.0.0.0:80，反向代理到 :8000）
+sudo systemctl start nginx
+
+# 3. 启动 cloudflared（连接隧道，转发域名请求到 nginx :80）
+cloudflared tunnel --config ~/.cloudflared/config.yml run
+```
+
+数据流：`外部请求 → Cloudflare CDN → cloudflared → nginx:80 → uvicorn:8000`
+
+**常见问题**：
+
+| 问题 | 原因 | 解决 |
+|------|------|------|
+| `502 Bad Gateway` | cloudflared 连不上本地 nginx | 检查 nginx 是否在 80 端口监听：`ss -tlnp \| grep :80` |
+| `ERR Cloudflared Not Connected` | 隧道未运行或已断开 | `systemctl status cloudflared` 检查服务状态 |
+| DNS 解析不到 | CNAME 记录未生效 | 检查 Cloudflare DNS 面板确认记录存在，等待 1-5 分钟传播 |
+| 访问超时 | 防火墙阻断 cloudflared 出站 | 确保出站 443 (TCP) 到 `*.argotunnel.com` 不受限制 |
