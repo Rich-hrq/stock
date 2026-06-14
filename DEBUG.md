@@ -476,3 +476,31 @@ load_dotenv()
 同时新增 `console.log` 诊断输出（`[K线分析]` 前缀），每次点击输出 OHLC、实体/波幅比、趋势判断结果、命中形态列表。
 
 **教训**：教科书形态插图是手绘示意，实际市场数据远不如示意图标准。阈值应从实盘数据反推校准，而非从示意图臆测。
+
+---
+
+## 市场数据文件缓存
+
+**背景**：每次页面加载、持仓查询都会调用 yfinance API 拉取美股数据。同一天内股价不变（尤其是收盘后），重复请求浪费带宽和时间。
+
+**解决**（2026-06-14）：
+- 在 `fetch_index_data_async` 中加入文件缓存层
+- 缓存 Key：`MD5(symbol|start_date|end_date|interval)` 前 16 位
+- 缓存格式：Pickle（数据 `.pkl`）+ JSON（元数据 `.meta.json`）
+- 有效期：当天有效（`cached_at.date() == today.date()`），次日自动过期
+- 存储位置：`backend/cache/market_data/`（已加入 `.gitignore`）
+- 并发安全：先写 `.tmp` 临时文件，再 `os.replace` 原子替换
+- 清理策略：每次写入时删除超过 7 天未修改的缓存文件
+
+**配置项**（`config.py`）：
+```python
+MARKET_DATA_CACHE_DIR = BACKEND_DIR / "cache" / "market_data"
+MARKET_DATA_CACHE_ENABLED = True
+MARKET_DATA_CACHE_MAX_AGE_DAYS = 7
+```
+
+**注意事项**：
+- 缓存仅在 `fetch_index_data_async` 层生效，直接调用同步 `fetch_index_data` 不经过缓存
+- 缓存文件损坏或版本不兼容时自动回退到 API，不影响正常功能
+- yfinance 返回空 DataFrame 时不写入缓存，避免缓存"无数据"状态
+- 如需强制刷新，删除 `backend/cache/market_data/` 目录下对应文件即可

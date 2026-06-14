@@ -422,6 +422,8 @@ stock_website/
 │   │   ├── rag.py                # RAG v1
 │   │   ├── rag_v2.py             # RAG v2
 │   │   └── rag_v3.py             # RAG v3（当前默认）
+│   ├── cache/                    # 本地文件缓存
+│   │   └── market_data/          # yfinance 数据缓存（Pickle）
 │   ├── knowledge/                # 知识库
 │   │   ├── ingest.py             # PDF → ChromaDB 构建脚本
 │   │   ├── test_rag.py           # RAG 版本对比测试
@@ -432,6 +434,7 @@ stock_website/
 │   ├── setup_nginx.sh            # 一键部署脚本
 │   └── GUIDE.md                  # Nginx 配置原理详解
 ├── FEATURES/                     # 功能设计档案（每功能一个 mini design doc）
+│   ├── market-data-cache.md      # 市场数据文件缓存
 │   ├── stock-index-analysis.md   # 美股指数技术分析
 │   ├── rag-qa-system.md          # RAG 智能问答系统
 │   ├── concurrency-improvements.md # 并发请求处理改进

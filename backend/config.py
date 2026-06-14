@@ -57,3 +57,8 @@ JWT_EXPIRE_DAYS = 7
 
 # ---- 汇率 API ----
 EXCHANGE_RATE_URL = "https://open.er-api.com/v6/latest/USD"
+
+# ---- 数据缓存 ----
+MARKET_DATA_CACHE_DIR = BACKEND_DIR / "cache" / "market_data"
+MARKET_DATA_CACHE_ENABLED = True
+MARKET_DATA_CACHE_MAX_AGE_DAYS = 7
