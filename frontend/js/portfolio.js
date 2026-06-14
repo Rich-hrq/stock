@@ -199,7 +199,7 @@
                     </div>
                     <div class="summary-row">
                         <span class="label">持仓份额</span>
-                        <span class="value">${parseFloat(p.shares).toFixed(4)}</span>
+                        <span class="value">${parseFloat(p.shares).toFixed(6)}</span>
                     </div>
                     <div class="summary-row">
                         <span class="label">加权成本</span>
@@ -270,7 +270,7 @@
                     <td>¥${parseFloat(tx.amount_cny).toFixed(2)}</td>
                     <td>$${parseFloat(tx.close_price_usd).toFixed(2)}</td>
                     <td>${parseFloat(tx.exchange_rate).toFixed(4)}</td>
-                    <td>${parseFloat(tx.shares).toFixed(4)}</td>
+                    <td>${parseFloat(tx.shares).toFixed(6)}</td>
                     <td><button class="btn-delete" data-id="${tx.id}">删除</button></td>
                 </tr>
                 `;
